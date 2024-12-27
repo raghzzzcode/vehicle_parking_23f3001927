@@ -71,7 +71,7 @@
   <script>
   import AppNavbar from "@/components/AppNavbar.vue";
   import AppFooter from "@/components/AppFooter.vue";
-  
+  import axios from "axios"; // Import axios for making HTTP requests
   export default {
     name: "ProfessionalRegister",
     components: {
@@ -94,35 +94,52 @@
       };
     },
     methods: {
-      handleRegister() {
-        if (
-          this.form.email &&
-          this.form.password &&
-          this.form.fullname &&
-          this.form.service_name &&
-          this.form.experience &&
-          this.form.documents &&
-          this.form.address &&
-          this.form.pincode
-        ) {
+  handleRegister() {
+    if (
+      this.form.email &&
+      this.form.password &&
+      this.form.fullname &&
+      this.form.service_name &&
+      this.form.experience &&
+      this.form.documents &&
+      this.form.address &&
+      this.form.pincode
+    ) {
+      // Create FormData object to send file and form data
+      let formData = new FormData();
+      formData.append('email', this.form.email);
+      formData.append('password', this.form.password);
+      formData.append('fullname', this.form.fullname);
+      formData.append('service_name', this.form.service_name);
+      formData.append('experience', this.form.experience);
+      formData.append('address', this.form.address);
+      formData.append('pincode', this.form.pincode);
+      formData.append('documents', this.form.documents);
+
+      // Send POST request to Flask backend
+      axios
+        .post('http://localhost:5000/api/register-professional', formData)
+        .then((response) => {
           this.messages.push({
-            category: "success",
-            text: "Registration successful!",
+            category: 'success',
+            text: response.data.message,
           });
-        } else {
+        })
+        .catch((error) => {
           this.messages.push({
-            category: "danger",
-            text: "Please fill in all required fields.",
+            category: 'danger',
+            text: error.response.data.error,
           });
-        }
-      },
-      handleFileUpload(event) {
-        this.form.documents = event.target.files[0];
-      },
-      closeMessage(index) {
-        this.messages.splice(index, 1);
-      },
-    },
+        });
+    } else {
+      this.messages.push({
+        category: 'danger',
+        text: 'Please fill in all required fields.',
+      });
+    }
+  },
+}
+,
   };
   </script>
   

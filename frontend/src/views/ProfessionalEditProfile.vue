@@ -117,21 +117,46 @@
       }
     },
     methods: {
-      handleFileChange(event) {
-        this.document = event.target.files[0]
-      },
-      updateProfile() {
-        // Placeholder logic for submitting the form data
-        // Here, you can make an API call to save the data
-        console.log('Profile data submitted:', this.formData)
-  
-        // Simulating a successful submission
-        this.flashMessage = {
-          type: 'success',
-          message: 'Profile updated successfully!'
-        }
-      }
+  handleFileChange(event) {
+    this.document = event.target.files[0];
+  },
+  async updateProfile() {
+    // Prepare form data to send to the backend
+    const formData = new FormData();
+    formData.append('full_name', this.formData.fullname);
+    formData.append('service_name', this.formData.serviceName);
+    formData.append('experience', this.formData.experience);
+    formData.append('address', this.formData.address);
+    formData.append('pincode', this.formData.pincode);
+    if (this.document) {
+      formData.append('document', this.document);
     }
+
+    // Send a PUT request to update the professional profile
+    try {
+      const response = await fetch(`/api/professional/${this.formData.professional_id}`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      const data = await response.json();
+      this.flashMessage = {
+        type: 'success',
+        message: data.message,
+      };
+    } catch (error) {
+      this.flashMessage = {
+        type: 'danger',
+        message: 'An error occurred while updating the profile.',
+      };
+    }
+  }
+}
+
   }
   </script>
   

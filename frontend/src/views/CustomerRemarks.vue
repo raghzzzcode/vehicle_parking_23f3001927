@@ -74,16 +74,47 @@
         remarks: "" // Remarks entered by the user
       };
     },
-    methods: {
-      setRating(index) {
-        this.rating = index + 1;
+    mounted() {
+  this.fetchServiceDetails();
+},
+methods: {
+  fetchServiceDetails() {
+    fetch(`/api/service/${this.service.service_id}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.service_id) {
+          this.service = data;
+        } else {
+          alert('Service not found');
+        }
+      })
+      .catch(error => console.error('Error fetching service details:', error));
+  },
+  submitRemarks() {
+    const requestData = {
+      service_id: this.service.service_id,
+      customer_id: 123, // replace with actual customer ID from the session or auth
+      rating: this.rating,
+      remarks: this.remarks
+    };
+
+    fetch('/api/service/remarks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
       },
-      submitRemarks() {
-        // Simulate form submission
-        alert(`Service ID: ${this.service.service_id}\nRating: ${this.rating}\nRemarks: ${this.remarks}`);
-        // Normally, you'd submit to the server here
-      }
-    }
+      body: JSON.stringify(requestData)
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.message) {
+          alert(data.message);
+        }
+      })
+      .catch(error => console.error('Error submitting remarks:', error));
+  }
+}
+
   };
   </script>
   

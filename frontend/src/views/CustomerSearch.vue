@@ -1,8 +1,10 @@
 <template>
-    <div class="container-fluid mb-5">
-      <!-- Customer Navbar -->
-      <CustomerNavbar />
-    
+  <div class="container-fluid mb-5">
+    <!-- Customer Navbar -->
+    <CustomerNavbar />
+  
+    <!-- Main Content with Padding -->
+    <div class="content-wrapper px-3">
       <!-- Search Form Section -->
       <form class="row align-items-center mb-4" @submit.prevent="search">
         <label for="searchBy" class="col-form-label me-2 search-label">Search by:</label>
@@ -58,157 +60,160 @@
         </div>
         <p v-else class="text-center no-results">No results found for your search.</p>
       </div>
-    
-      <!-- App Footer -->
-      <AppFooter />
     </div>
-  </template>
     
-  <script>
-  import CustomerNavbar from '@/components/CustomerNavbar.vue';
-  import AppFooter from '@/components/AppFooter.vue';
-  
-  export default {
-    components: {
-      CustomerNavbar,
-      AppFooter
-    },
-    data() {
-      return {
-        searchBy: 'service_name',
-        searchInput: '',
-        searchResults: [
-          {
-            professional_id: 1,
-            full_name: 'John Doe',
-            service_name: 'Plumbing',
-            experience: '5 years',
-            address: '123 Street, City',
-            pincode: '123456',
-            email: 'john.doe@example.com'
-          },
-          {
-            professional_id: 2,
-            full_name: 'Jane Smith',
-            service_name: 'Electrical',
-            experience: '7 years',
-            address: '456 Avenue, City',
-            pincode: '654321',
-            email: 'jane.smith@example.com'
+    <!-- App Footer -->
+    <AppFooter />
+  </div>
+</template>
+
+<script>
+import CustomerNavbar from '@/components/CustomerNavbar.vue';
+import AppFooter from '@/components/AppFooter.vue';
+import axios from 'axios';  // Import Axios for making API requests
+
+export default {
+  components: {
+    CustomerNavbar,
+    AppFooter
+  },
+  data() {
+    return {
+      searchBy: 'service_name',
+      searchInput: '',
+      searchResults: [],
+      searchTitle: 'Search Results'
+    };
+  },
+  methods: {
+    async search() {
+      try {
+        const response = await axios.get('http://localhost:5000/search', {
+          params: {
+            search_by: this.searchBy,
+            search_input: this.searchInput
           }
-        ]
-      };
-    },
-    computed: {
-      searchTitle() {
-        if (this.searchBy === 'service_name') return 'Service Name Search Results';
-        if (this.searchBy === 'pin_code') return 'Pincode Search Results';
-        if (this.searchBy === 'location') return 'Location Search Results';
-        return 'Search Results';
+        });
+        this.searchResults = response.data;
+      } catch (error) {
+        console.error('Error searching:', error);
+        this.searchResults = [];
       }
     },
-    methods: {
-      search() {
-        console.log(`Searching for ${this.searchInput} by ${this.searchBy}`);
-      },
-      bookService(professional_id, service_name, professional_name) {
-        console.log(`Booking service for ${professional_name}`);
+    async bookService(professional_id, service_name, professional_name) {
+      const customer_id = 1; // Get this dynamically (e.g., from the logged-in user's session)
+      try {
+        const response = await axios.post('http://localhost:5000/book', {
+          professional_id,
+          service_name,
+          professional_name,
+          customer_id
+        });
+        alert(response.data.message);
+      } catch (error) {
+        console.error('Error booking service:', error);
+        alert('Error booking the service');
       }
     }
-  };
-  </script>
-  
-  <style scoped>
-  /* Enhanced styling for search form and results */
-  .search-label {
-    font-weight: 600;
-    color: #004aad;
   }
-  
-  .search-select,
-  .search-input,
-  .search-btn {
-    border-radius: 8px;
-    font-size: 16px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  .search-select,
-  .search-input {
-    width: 250px;
-  }
-  
-  .search-btn {
-    padding: 10px 20px;
-    font-weight: 600;
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-  }
-  
-  .search-btn:hover {
-    background-color: #0056b3;
-  }
-  
-  .search-title {
-    color: #004aad;
-    font-weight: 600;
-  }
-  
-  .search-table thead {
-    background-color: #d9eaf7;
-    color: #084298;
-  }
-  
-  .search-table tbody tr {
-    background-color: #f9f9f9;
-    color: #333;
-  }
-  
-  .book-btn {
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-weight: 600;
-    background-color: #28a745;
-    color: white;
-    border: none;
-  }
-  
-  .book-btn:hover {
-    background-color: #218838;
-  }
-  
-  .no-results {
-    font-weight: 500;
-    color: #888;
-  }
-  
-  /* Navbar styling */
-  .navbar {
-    width: 100%;
-    background-color: #004aad;
-    padding: 10px 0;
-  }
-  
-  .navbar-nav .nav-link {
-    color: white !important;
-  }
-  
-  .navbar-nav .nav-link:hover {
-    color: #ffbb33 !important;
-  }
-  
-  /* Ensures the navbar stretches fully across */
-  .container-fluid {
-    padding-left: 0;
-    padding-right: 0;
-  }
-  
-  /* Ensure full-width table responsiveness */
-  .table-responsive {
-    width: 100%;
-    overflow-x: auto;
-  }
-  
-  </style>
-  
+};
+</script>
+
+<style scoped>
+/* Enhanced styling for search form and results */
+.search-label {
+  font-weight: 600;
+  color: #004aad;
+}
+
+.search-select,
+.search-input,
+.search-btn {
+  border-radius: 8px;
+  font-size: 16px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.search-select,
+.search-input {
+  width: 250px;
+}
+
+.search-btn {
+  padding: 10px 20px;
+  font-weight: 600;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+}
+
+.search-btn:hover {
+  background-color: #0056b3;
+}
+
+.search-title {
+  color: #004aad;
+  font-weight: 600;
+}
+
+.search-table thead {
+  background-color: #d9eaf7;
+  color: #084298;
+}
+
+.search-table tbody tr {
+  background-color: #f9f9f9;
+  color: #333;
+}
+
+.book-btn {
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  background-color: #28a745;
+  color: white;
+  border: none;
+}
+
+.book-btn:hover {
+  background-color: #218838;
+}
+
+.no-results {
+  font-weight: 500;
+  color: #888;
+}
+
+/* Padding adjustments for content wrapper */
+.content-wrapper {
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+/* Navbar styling */
+.navbar {
+  width: 100%;
+  background-color: #004aad;
+  padding: 10px 0;
+}
+
+.navbar-nav .nav-link {
+  color: white !important;
+}
+
+.navbar-nav .nav-link:hover {
+  color: #ffbb33 !important;
+}
+
+/* App Footer - No additional padding */
+.container-fluid {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Ensure full-width table responsiveness */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+</style>

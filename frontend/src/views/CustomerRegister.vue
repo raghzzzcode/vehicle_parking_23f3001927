@@ -79,23 +79,33 @@
       };
     },
     methods: {
-      handleRegister() {
-        if (this.form.email && this.form.password && this.form.fullname && this.form.address && this.form.pincode) {
-          this.messages.push({
-            category: "success",
-            text: "Registration successful!",
-          });
-        } else {
-          this.messages.push({
-            category: "danger",
-            text: "Please fill in all required fields.",
-          });
-        }
-      },
-      closeMessage(index) {
-        this.messages.splice(index, 1);
-      },
-    },
+  async handleRegister() {
+    // Check if all required fields are filled
+    if (this.form.email && this.form.password && this.form.fullname && this.form.address && this.form.pincode) {
+      try {
+        // Make the API call to register the customer
+        const response = await this.$axios.post('/api/register', this.form);
+        this.messages.push({
+          category: 'success',
+          text: response.data.message
+        });
+      } catch (error) {
+        // Handle error
+        const errorMsg = error.response?.data?.error || 'Registration failed';
+        this.messages.push({
+          category: 'danger',
+          text: errorMsg
+        });
+      }
+    } else {
+      this.messages.push({
+        category: 'danger',
+        text: 'Please fill in all required fields.'
+      });
+    }
+  }
+}
+,
   };
   </script>
   

@@ -27,6 +27,8 @@ class Professional(db.Model):
     pincode = db.Column(db.String(10), nullable=False)
     status = db.Column(Enum('pending', 'approved', 'blocked', name='status'), default='pending')
     role = db.Column(Enum('professional', name='role'), default='professional')
+    date_created = db.Column(db.DateTime, nullable=False)
+    date_updated = db.Column(db.DateTime, nullable=False)
 
 # Admin Table
 class Admin(db.Model):
@@ -40,6 +42,7 @@ class Service(db.Model):
     service_name = db.Column(db.String(256), nullable=False)
     base_price = db.Column(db.Integer, nullable=False)
     description = db.Column(db.Text, nullable=True)
+    time_required = db.Column(db.Integer, nullable=False)
 
 # ServiceRequest Table 
 class ServiceRequest(db.Model):
