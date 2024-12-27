@@ -54,7 +54,7 @@
         <table class="table table-striped table-hover shadow rounded">
           <thead style="background-color: #d9eaf7; color: #084298;">
             <tr>
-              <th>ID</th>
+              <th v-if="searchBy === 'services' || searchBy === 'service_requests'">Service ID</th>
               <th v-if="searchBy === 'services'">Service Name</th>
               <th v-if="searchBy === 'services'">Base Price</th>
               <th v-if="searchBy === 'services'">Status</th>
@@ -71,7 +71,7 @@
           </thead>
           <tbody>
             <tr v-for="(result, index) in searchResults" :key="index" style="background-color: #f9f9f9; color: #333;">
-              <td><a href="#" style="color: #004aad;">{{ result.id }}</a></td>
+              <td v-if="searchBy === 'services' || searchBy === 'service_requests'">{{ result.service_id || 'N/A' }}</td>
               <td v-if="searchBy === 'services'">{{ result.service_name }}</td>
               <td v-if="searchBy === 'services'">${{ result.base_price }}</td>
               <td v-if="searchBy === 'services'">{{ result.status || 'N/A' }}</td>
@@ -87,6 +87,27 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Pagination Section -->
+        <div class="d-flex justify-content-between align-items-center mt-4">
+          <button
+            class="btn btn-outline-primary"
+            :disabled="currentPage === 1"
+            @click="prevPage"
+          >
+            Previous
+          </button>
+          <p class="mb-0" style="color: #004aad; font-weight: 500;">
+            Page {{ currentPage }} of {{ totalPages }}
+          </p>
+          <button
+            class="btn btn-outline-primary"
+            :disabled="currentPage === totalPages"
+            @click="nextPage"
+          >
+            Next
+          </button>
+        </div>
       </div>
       <p v-else class="text-center" style="font-weight: 500; color: #888;">No results found for your search.</p>
     </div>
@@ -97,6 +118,7 @@
 </template>
 
 <script>
+import instance from '@/axios.js';
 import AdminNavbar from "@/components/AdminNavbar.vue";
 import AppFooter from "@/components/AppFooter.vue";
 
@@ -110,6 +132,9 @@ export default {
       searchBy: "services", // Default search option
       searchText: "",
       searchResults: [], // Will be fetched from the backend
+      totalResults: 0,  // Store the total number of results
+      currentPage: 1,   // Track the current page
+      resultsPerPage: 10, // Default results per page
     };
   },
   computed: {
@@ -125,19 +150,37 @@ export default {
       }
       return "Search Results";
     },
+    totalPages() {
+      return Math.ceil(this.totalResults / this.resultsPerPage);
+    },
   },
   methods: {
     async submitSearch() {
       try {
-        const response = await fetch(`http://localhost:5000/search?by=${this.searchBy}&text=${this.searchText}`);
-        if (response.ok) {
-          const data = await response.json();
-          this.searchResults = data.results;
-        } else {
-          console.error("Error fetching search results");
-        }
+        const response = await instance.get("admin_search", {
+          params: {
+            by: this.searchBy,
+            text: this.searchText,
+            page: this.currentPage,  // Include pagination params
+            per_page: this.resultsPerPage,
+          },
+        });
+        this.searchResults = response.data.results;
+        this.totalResults = response.data.total;  // Set the total results
       } catch (error) {
-        console.error("Error:", error);
+        console.error("Error fetching search results:", error);
+      }
+    },
+    nextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage += 1;
+        this.submitSearch();
+      }
+    },
+    prevPage() {
+      if (this.currentPage > 1) {
+        this.currentPage -= 1;
+        this.submitSearch();
       }
     },
   },

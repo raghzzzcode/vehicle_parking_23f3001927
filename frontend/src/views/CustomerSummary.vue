@@ -31,7 +31,7 @@
 
 <script>
 // Importing the necessary libraries
-import axios from 'axios';
+import instance from '@/axios.js';
 import Chart from 'chart.js/auto';
 import CustomerNavbar from "@/components/CustomerNavbar.vue";
 import AppFooter from "@/components/AppFooter.vue";
@@ -62,7 +62,7 @@ export default {
   methods: {
     // Fetch service history data from the backend
     fetchServiceHistory() {
-      axios.get(`/api/service-history/${this.customerId}`)
+      instance.get(`service-history/${this.customerId}`)
         .then(response => {
           this.serviceHistoryData = response.data;
           this.createServiceHistoryChart();

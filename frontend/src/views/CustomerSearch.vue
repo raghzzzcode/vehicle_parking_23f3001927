@@ -70,7 +70,7 @@
 <script>
 import CustomerNavbar from '@/components/CustomerNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
-import axios from 'axios';  // Import Axios for making API requests
+import instance from '@/axios.js';  // Assuming instance is configured for API requests
 
 export default {
   components: {
@@ -81,38 +81,55 @@ export default {
     return {
       searchBy: 'service_name',
       searchInput: '',
-      searchResults: [],
-      searchTitle: 'Search Results'
+      searchResults: []
     };
   },
+  computed: {
+    searchTitle() {
+      if (this.searchBy === 'service_name') return 'Service Name Search Results';
+      if (this.searchBy === 'pin_code') return 'Pincode Search Results';
+      if (this.searchBy === 'location') return 'Location Search Results';
+      return 'Search Results';
+    }
+  },
   methods: {
+    // Search method to call the Flask API
     async search() {
       try {
-        const response = await axios.get('http://localhost:5000/search', {
+        const response = await instance.get('/customer_search', {
           params: {
             search_by: this.searchBy,
             search_input: this.searchInput
           }
         });
-        this.searchResults = response.data;
+        if (response.data.length > 0) {
+          this.searchResults = response.data;
+        } else {
+          this.searchResults = [];
+          alert('No results found.');
+        }
       } catch (error) {
-        console.error('Error searching:', error);
-        this.searchResults = [];
+        console.error('Error fetching search results:', error);
+        alert('An error occurred while searching.');
       }
     },
+
+    // Booking method to call the Flask API
     async bookService(professional_id, service_name, professional_name) {
-      const customer_id = 1; // Get this dynamically (e.g., from the logged-in user's session)
+      const customer_id = 123; // Replace with actual customer ID from session or auth
+      const data = {
+        professional_id,
+        service_name,
+        professional_name,
+        customer_id
+      };
+
       try {
-        const response = await axios.post('http://localhost:5000/book', {
-          professional_id,
-          service_name,
-          professional_name,
-          customer_id
-        });
-        alert(response.data.message);
+        const response = await instance.post('/customer_book', data);
+        alert(response.data.message);  // Show success message
       } catch (error) {
         console.error('Error booking service:', error);
-        alert('Error booking the service');
+        alert('An error occurred while booking the service.');
       }
     }
   }

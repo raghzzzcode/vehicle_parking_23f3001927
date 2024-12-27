@@ -20,8 +20,8 @@ class Professional(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255), nullable=False)
-    service_name = db.Column(db.String(255), nullable=False)
-    experience = db.Column(db.Integer, nullable=False)
+    service_id = db.Column(db.Integer, db.ForeignKey('service.service_id'), nullable=False)  # Foreign key to Service
+    experience = db.Column(db.String(255), nullable=False)
     document = db.Column(db.LargeBinary)  # To store profile documents (e.g., PDF)
     address = db.Column(db.Text, nullable=False)
     pincode = db.Column(db.String(10), nullable=False)

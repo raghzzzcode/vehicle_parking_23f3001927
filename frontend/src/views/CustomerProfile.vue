@@ -42,7 +42,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import instance from '@/axios.js';
 import CustomerNavbar from "@/components/CustomerNavbar.vue";
 import AppFooter from "@/components/AppFooter.vue";
 
@@ -67,7 +67,7 @@ export default {
   methods: {
     async fetchCustomerProfile() {
       try {
-        const response = await axios.get('/api/customer/profile');
+        const response = await instance.get('customer/profile');
         this.customer = response.data;
       } catch (error) {
         console.error("Error fetching customer profile:", error);
@@ -75,7 +75,7 @@ export default {
     },
     async logout() {
       try {
-        await axios.post('/api/logout');
+        await instance.post('logout');
         this.$router.push('/login');
       } catch (error) {
         console.error("Logout error:", error);

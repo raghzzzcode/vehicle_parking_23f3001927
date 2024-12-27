@@ -21,7 +21,10 @@
             <td>{{ service.name }}</td>
             <td>${{ service.basePrice }}</td>
             <td>
-              <a :href="'/admin_edit_service/' + service.id" class="btn btn-outline-primary btn-sm">Edit</a>
+              <!-- Redirect to Admin_Edit_Service page with service id -->
+              <router-link :to="'/admin_edit_service/' + service.id" class="btn btn-outline-primary btn-sm">Edit</router-link>
+
+              <!-- Delete Form -->
               <form @submit.prevent="deleteService(service.id)" style="display:inline;">
                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
               </form>
@@ -36,40 +39,43 @@
       </div>
 
       <!-- Professionals Section -->
-      <h3 class="text-center mb-4" style="color: #003366;">Professionals</h3>
-      <table class="table table-striped table-hover shadow rounded">
-        <thead style="background-color: #b3d9ff; color: #003366;">
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Experience (Yrs)</th>
-            <th>Service Name</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(professional, index) in professionals" :key="professional.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
-            <td><a href="#" style="color: #004aad;">{{ professional.id }}</a></td>
-            <td>{{ professional.name }}</td>
-            <td>{{ professional.experience }}</td>
-            <td>{{ professional.serviceName }}</td>
-            <td>
-              <span v-if="professional.status" class="badge bg-secondary">{{ professional.status }}</span>
-              <template v-else>
-                <form @submit.prevent="approveProfessional(professional.id)" style="display:inline;">
-                  <button type="submit" class="btn btn-outline-success btn-sm">Approve</button>
-                </form>
-                <form @submit.prevent="rejectProfessional(professional.id)" style="display:inline;">
-                  <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
-                </form>
-                <form @submit.prevent="deleteProfessional(professional.id)" style="display:inline;">
-                  <button type="submit" class="btn btn-outline-warning btn-sm">Delete</button>
-                </form>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+<h3 class="text-center mb-4" style="color: #003366;">Professionals</h3>
+<table class="table table-striped table-hover shadow rounded">
+  <thead style="background-color: #b3d9ff; color: #003366;">
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Experience (Yrs)</th>
+      <th>Service ID</th>  <!-- Updated column name -->
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr v-for="(professional, index) in professionals" :key="professional.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
+      <td><a href="#" style="color: #004aad;">{{ professional.id }}</a></td>
+      <td>{{ professional.name }}</td>
+      <td>{{ professional.experience }}</td>
+      <td>{{ professional.serviceid }}</td>  <!-- Updated to display serviceid -->
+      <td>
+        <span v-if="professional.status && professional.status !== 'pending'" class="badge bg-secondary">{{ professional.status }}</span>
+        
+        <!-- Show these actions only if the status is "pending" -->
+        <template v-if="professional.status === 'pending'">
+          <form @submit.prevent="approveProfessional(professional.id)" style="display:inline;">
+            <button type="submit" class="btn btn-outline-success btn-sm">Approve</button>
+          </form>
+          <form @submit.prevent="rejectProfessional(professional.id)" style="display:inline;">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
+          </form>
+          <form @submit.prevent="deleteProfessional(professional.id)" style="display:inline;">
+            <button type="submit" class="btn btn-outline-warning btn-sm">Delete</button>
+          </form>
+        </template>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
 
       <!-- Service Requests Section -->
       <h3 class="text-center mb-4" style="color: #003366;">Service Requests</h3>
@@ -99,6 +105,7 @@
 </template>
 
 <script>
+import instance from '@/axios.js';
 import AdminNavbar from '@/components/AdminNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
 
@@ -118,100 +125,70 @@ export default {
   methods: {
     async fetchServices() {
       try {
-        const response = await fetch('/api/services');
-        if (response.ok) {
-          this.services = await response.json();
-        }
+        const response = await instance.get('get_services');
+        this.services = response.data;
       } catch (error) {
-        console.log('Error fetching services:', error);
+        console.error('Error fetching services:', error);
       }
     },
 
     async fetchProfessionals() {
       try {
-        const response = await fetch('/api/professionals');
-        if (response.ok) {
-          this.professionals = await response.json();
-        }
+        const response = await instance.get('get_professionals');
+        this.professionals = response.data;  // Ensure serviceid is populated here
       } catch (error) {
-        console.log('Error fetching professionals:', error);
+        console.error('Error fetching professionals:', error);
       }
     },
 
     async fetchServiceRequests() {
       try {
-        const response = await fetch('/api/service_requests');
-        if (response.ok) {
-          this.serviceRequests = await response.json();
-        }
+        const response = await instance.get('get_service_requests');
+        this.serviceRequests = response.data;
       } catch (error) {
-        console.log('Error fetching service requests:', error);
+        console.error('Error fetching service requests:', error);
       }
     },
 
     async deleteService(id) {
       try {
-        const response = await fetch(`/api/services/${id}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          this.services = this.services.filter(service => service.id !== id);
-          console.log(`Service with ID ${id} deleted`);
-        } else {
-          console.log('Failed to delete service');
-        }
+        await instance.delete(`delete_service/${id}`);
+        this.services = this.services.filter(service => service.id !== id);
+        console.log(`Service with ID ${id} deleted`);
       } catch (error) {
-        console.log('Error deleting service:', error);
+        console.error('Error deleting service:', error);
       }
     },
 
     async approveProfessional(id) {
       try {
-        const response = await fetch(`/api/professionals/${id}/approve`, {
-          method: 'POST',
-        });
-        if (response.ok) {
-          const professional = this.professionals.find(p => p.id === id);
-          professional.status = 'approved';
-          console.log(`Professional with ID ${id} approved`);
-        } else {
-          console.log('Failed to approve professional');
-        }
+        await instance.post(`professionals/${id}/approve`);
+        const professional = this.professionals.find(p => p.id === id);
+        professional.status = 'approved';
+        console.log(`Professional with ID ${id} approved`);
       } catch (error) {
-        console.log('Error approving professional:', error);
+        console.error('Error approving professional:', error);
       }
     },
 
     async rejectProfessional(id) {
       try {
-        const response = await fetch(`/api/professionals/${id}/reject`, {
-          method: 'POST',
-        });
-        if (response.ok) {
-          const professional = this.professionals.find(p => p.id === id);
-          professional.status = 'rejected';
-          console.log(`Professional with ID ${id} rejected`);
-        } else {
-          console.log('Failed to reject professional');
-        }
+        await instance.post(`professionals/${id}/reject`);
+        const professional = this.professionals.find(p => p.id === id);
+        professional.status = 'rejected';
+        console.log(`Professional with ID ${id} rejected`);
       } catch (error) {
-        console.log('Error rejecting professional:', error);
+        console.error('Error rejecting professional:', error);
       }
     },
 
     async deleteProfessional(id) {
       try {
-        const response = await fetch(`/api/professionals/${id}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          this.professionals = this.professionals.filter(prof => prof.id !== id);
-          console.log(`Professional with ID ${id} deleted`);
-        } else {
-          console.log('Failed to delete professional');
-        }
+        await instance.delete(`professionals/${id}/delete`);
+        this.professionals = this.professionals.filter(prof => prof.id !== id);
+        console.log(`Professional with ID ${id} deleted`);
       } catch (error) {
-        console.log('Error deleting professional:', error);
+        console.error('Error deleting professional:', error);
       }
     }
   },

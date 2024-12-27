@@ -1,7 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, request, session
 import secrets
-from backend.models import db, Migrate
-from backend.models import Service, Customer, Professional, Admin, ServiceRequest, Review
+from models import db, Service, Customer, Professional, Admin, ServiceRequest, Review
+from flask_migrate import Migrate
 from flask import jsonify
 from werkzeug.security import check_password_hash
 from datetime import datetime
@@ -10,13 +10,15 @@ from sqlalchemy import func
 from werkzeug.security import generate_password_hash
 import os
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
+from sqlalchemy.exc import SQLAlchemyError
 
 
 app = Flask(__name__)   
 app.secret_key = secrets.token_hex(16)
 
 # Configuration for the database
-app.config['SQLALCHEMY_DATABASE_URI'] = r"sqlite:////tmp/household_services_database_2.db"
+app.config['SQLALCHEMY_DATABASE_URI'] = r"sqlite:///C:/Users/hp/Desktop/household_services_final.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads/'  # Directory where documents will be uploaded
 app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
@@ -25,11 +27,21 @@ app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
 db.init_app(app)
 m = Migrate(app,db)
 
-# Create the tables (Only needed on the first run)
-with app.app_context():
-    db.create_all()
+CORS(app, resources={r"/*": {"origins": "http://localhost:8000"}})
 
-app.route('/api/services', methods=['GET'])
+# Create tables (Only needed on the first run)
+# with app.app_context():
+#     db.create_all()
+#     print("Tables created successfully")
+      
+      
+
+@app.route('/')
+def home():
+    return "Welcome to the Home Page!"
+
+
+@app.route('/api/get_services', methods=['GET'])
 def get_services():
     services = Service.query.all()
     return jsonify([{
@@ -38,31 +50,22 @@ def get_services():
         'basePrice': service.base_price
     } for service in services])
 
-@app.route('/api/services/<int:id>', methods=['GET'])
-def get_service(id):
-    service = Service.query.get(id)
-    if service:
-        return jsonify({
-            'id': service.service_id,
-            'name': service.service_name,
-            'basePrice': service.base_price
-        })
-    return jsonify({'error': 'Service not found'}), 404
 
-@app.route('/api/services', methods=['POST'])
+@app.route('/api/add_service', methods=['POST'])
 def add_service():
     data = request.get_json()
+    print(data)
     new_service = Service(
-        service_name=data['name'],
-        base_price=data['basePrice'],
-        description=data.get('description', ''),
-        time_required=data['timeRequired']
+    service_name=data['service_name'],
+    base_price=data['base_price'],
+    description=data.get('description', ''),
+    time_required=data['time_required']
     )
     db.session.add(new_service)
     db.session.commit()
     return jsonify({'message': 'Service added successfully'}), 201
 
-@app.route('/api/services/<int:id>', methods=['DELETE'])
+@app.route('/api/delete_service/<int:id>', methods=['DELETE'])
 def delete_service(id):
     service = Service.query.get(id)
     if service:
@@ -71,14 +74,14 @@ def delete_service(id):
         return jsonify({'message': 'Service deleted successfully'}), 200
     return jsonify({'error': 'Service not found'}), 404
 
-@app.route('/api/professionals', methods=['GET'])
+@app.route('/api/get_professionals', methods=['GET'])
 def get_professionals():
     professionals = Professional.query.all()
     return jsonify([{
         'id': pro.professional_id,
         'name': pro.full_name,
         'experience': pro.experience,
-        'serviceName': pro.service_name,
+        'serviceid': pro.service_id,
         'status': pro.status
     } for pro in professionals])
 
@@ -100,7 +103,7 @@ def reject_professional(id):
         return jsonify({'message': 'Professional rejected'}), 200
     return jsonify({'error': 'Professional not found'}), 404
 
-@app.route('/api/professionals/<int:id>', methods=['DELETE'])
+@app.route('/api/professionals/<int:id>/delete', methods=['DELETE'])
 def delete_professional(id):
     professional = Professional.query.get(id)
     if professional:
@@ -109,7 +112,7 @@ def delete_professional(id):
         return jsonify({'message': 'Professional deleted successfully'}), 200
     return jsonify({'error': 'Professional not found'}), 404
 
-@app.route('/api/service_requests', methods=['GET'])
+@app.route('/api/get_service_requests', methods=['GET'])
 def get_service_requests():
     service_requests = ServiceRequest.query.join(Service, ServiceRequest.service_id == Service.service_id).join(Professional, ServiceRequest.professional_id == Professional.professional_id).all()
     return jsonify([{
@@ -119,159 +122,229 @@ def get_service_requests():
         'status': request.service_status
     } for request in service_requests])
 
-@app.route('/api/service_requests/<int:id>', methods=['GET'])
-def get_service_request(id):
-    service_request = ServiceRequest.query.join(Service, ServiceRequest.service_id == Service.service_id).join(Professional, ServiceRequest.professional_id == Professional.professional_id).filter(ServiceRequest.request_id == id).first()
-    if service_request:
-        return jsonify({
-            'id': service_request.request_id,
-            'serviceName': service_request.service_name,
-            'professional': service_request.professional.full_name if service_request.professional else 'N/A',
-            'status': service_request.service_status
-        })
-    return jsonify({'error': 'Service request not found'}), 404
-
-@app.route('/api/service_requests/assign', methods=['POST'])
-def assign_professional_to_request():
-    data = request.get_json()
-    service_request = ServiceRequest.query.get(data['requestId'])
-    professional = Professional.query.get(data['professionalId'])
-    if service_request and professional:
-        service_request.professional_id = professional.professional_id
-        service_request.service_status = 'assigned'
-        db.session.commit()
-        return jsonify({'message': 'Professional assigned to request successfully'}), 200
-    return jsonify({'error': 'Service request or professional not found'}), 404
-
-@app.route('/api/service_requests/<int:id>/update_status', methods=['POST'])
-def update_service_request_status(id):
-    data = request.get_json()
-    service_request = ServiceRequest.query.get(id)
-    if service_request:
-        service_request.service_status = data['status']
-        service_request.date_of_completion = datetime.now() if data['status'] == 'completed' else None
-        db.session.commit()
-        return jsonify({'message': 'Service request status updated successfully'}), 200
-    return jsonify({'error': 'Service request not found'}), 404
-
-
-@app.route("/search", methods=["GET"])
-def search():
-    search_by = request.args.get("by")
-    search_text = request.args.get("text")
-    results = []
-
-    if search_by == "services":
-        results = Service.query.filter(Service.service_name.ilike(f"%{search_text}%")).all()
-    elif search_by == "service_requests":
-        results = ServiceRequest.query.filter(ServiceRequest.service_status.ilike(f"%{search_text}%")).all()
-    elif search_by == "customers":
-        results = Customer.query.filter(Customer.full_name.ilike(f"%{search_text}%")).all()
-    elif search_by == "professionals":
-        results = Professional.query.filter(Professional.full_name.ilike(f"%{search_text}%")).all()
-
-    return jsonify({"results": [result.to_dict() for result in results]}), 200
-
-# API Route to fetch ratings data
-@app.route('/api/ratings', methods=['GET'])
-def get_ratings():
-    ratings = db.session.query(Review.rating, db.func.count(Review.rating)).group_by(Review.rating).all()
-    ratings_data = {str(rating): count for rating, count in ratings}
-    return jsonify(ratings_data)
-
-# API Route to fetch service requests data
-@app.route('/api/service-requests', methods=['GET'])
-def get_service_requests():
-    statuses = db.session.query(
-        ServiceRequest.service_status,
-        db.func.count(ServiceRequest.service_status)
-    ).group_by(ServiceRequest.service_status).all()
-    request_data = {status: count for status, count in statuses}
-    return jsonify(request_data)
-
-@app.route('/api/services/<int:id>', methods=['DELETE'])
-def delete_service(id):
-    # Find the service by ID
+@app.route('/api/get_service_basedon_id/<int:id>', methods=['GET', 'PUT'])
+def get_service(id):
     service = Service.query.get(id)
     
-    if service:
-        try:
-            db.session.delete(service)  # Delete the service from the database
-            db.session.commit()
-            return jsonify({'message': 'Service deleted successfully'}), 200
-        except Exception as e:
-            db.session.rollback()  # Rollback in case of any error
-            return jsonify({'error': str(e)}), 500
-    else:
+    if request.method == 'GET':
+        if service:
+            return jsonify({
+                'service_id': service.service_id,  # Mapping id to service_id
+                'service_name': service.service_name,  # Mapping name to service_name
+                'base_price': service.base_price,  # Mapping basePrice to base_price
+                'description': service.description,  # Adding description
+                'time_required': service.time_required  # Adding time_required
+            })
         return jsonify({'error': 'Service not found'}), 404
 
-@app.route('/login', methods=['POST'])
-def login():
+    if request.method == 'PUT':
+        if service:
+            data = request.get_json()
+            if 'name' in data:
+                service.service_name = data['name']
+            if 'basePrice' in data:
+                service.base_price = data['basePrice']
+            if 'description' in data:
+                service.description = data['description']
+            if 'timeRequired' in data:
+                service.time_required = data['timeRequired']
+
+            # Commit the changes to the database
+            db.session.commit()
+
+            return jsonify({
+                'message': 'Service updated successfully',
+                'service': {
+                    'id': service.service_id,
+                    'name': service.service_name,
+                    'basePrice': service.base_price,
+                    'description': service.description,
+                    'timeRequired': service.time_required
+                }
+            })
+        return jsonify({'error': 'Service not found'}), 404
+    
+@app.route('/update_service/<int:service_id>', methods=['PUT'])
+def update_service(service_id):
+    # Find the service by ID
+    service = Service.query.get(service_id)
+
+    if not service:
+        return jsonify({"error": "Service not found"}), 404
+
+    # Get the updated data from the request body
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    
+    # Update the service fields
+    service.service_name = data.get('service_name', service.service_name)
+    service.base_price = data.get('base_price', service.base_price)
+    service.description = data.get('description', service.description)
+    service.time_required = data.get('time_required', service.time_required)
+    
+    try:
+        # Commit the changes to the database
+        db.session.commit()
+        return jsonify({"message": "Service updated successfully", "service": {
+            "service_id": service.service_id,
+            "service_name": service.service_name,
+            "base_price": service.base_price,
+            "description": service.description,
+            "time_required": service.time_required
+        }}), 200
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
 
-    # Check if the user exists in the Customer table
-    customer = Customer.query.filter_by(email=email).first()
-    if customer and check_password_hash(customer.password, password):
-        return jsonify({"success": True, "role": "customer"}), 200
+@app.route("/api/admin_search", methods=["GET"])
+def admin_search():
+    search_by = request.args.get("by")
+    search_text = request.args.get("text")
+    page = request.args.get("page", 1, type=int)  # Default to the first page
+    per_page = request.args.get("per_page", 10, type=int)  # Number of results per page
+    results = []
+    total_results = 0
 
-    # Check if the user exists in the Professional table
-    professional = Professional.query.filter_by(email=email).first()
-    if professional and check_password_hash(professional.password, password):
-        return jsonify({"success": True, "role": "professional"}), 200
+    if search_by == "services":
+        query = Service.query.filter(Service.service_name.ilike(f"%{search_text}%"))
+        total_results = query.count()
+        results = query.paginate(page=page, per_page=per_page, error_out=False).items
+    elif search_by == "service_requests":
+        query = ServiceRequest.query.filter(ServiceRequest.service_status.ilike(f"%{search_text}%"))
+        total_results = query.count()
+        results = query.paginate(page=page, per_page=per_page, error_out=False).items
+    elif search_by == "customers":
+        query = Customer.query.filter(Customer.full_name.ilike(f"%{search_text}%"))
+        total_results = query.count()
+        results = query.paginate(page=page, per_page=per_page, error_out=False).items
+    elif search_by == "professionals":
+        query = Professional.query.filter(Professional.full_name.ilike(f"%{search_text}%"))
+        total_results = query.count()
+        results = query.paginate(page=page, per_page=per_page, error_out=False).items
 
-    # Check if the user exists in the Admin table
+    # Serialize the results properly, ensuring `id`, `service_id`, and other attributes are included
+    serialized_results = [
+        {key: getattr(result, key) for key in result.__table__.columns.keys()} for result in results
+    ]
+
+    # Add `service_id` to results if applicable
+    for result in serialized_results:
+        if hasattr(result, "service_id"):
+            result["service_id"] = getattr(result, "service_id")
+
+    return jsonify({
+        "results": serialized_results,
+        "page": page,
+        "per_page": per_page,
+        "total": total_results
+    }), 200
+
+
+
+@app.route('/api/ratings-summary', methods=['GET'])
+def get_ratings_summary():
+    ratings_summary = db.session.query(
+        Review.rating,
+        db.func.count(Review.rating).label('count')
+    ).group_by(Review.rating).all()
+
+    ratings_data = {rating: count for rating, count in ratings_summary}
+
+    # Ensure all ratings (1-5) are represented
+    for i in range(1, 6):
+        ratings_data.setdefault(i, 0)
+
+    return jsonify(ratings_data)
+
+@app.route('/api/service-summary', methods=['GET'])
+def get_service_requests_summary():
+    service_requests_summary = db.session.query(
+        ServiceRequest.service_status,
+        db.func.count(ServiceRequest.service_status).label('count')
+    ).group_by(ServiceRequest.service_status).all()
+
+    service_data = {status: count for status, count in service_requests_summary}
+
+    return jsonify(service_data)
+
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    # Get login credentials from the request
+    email = request.json.get('email')
+    password = request.json.get('password')
+    
+    if not email or not password:
+        return jsonify({'success': False, 'message': 'Email and password are required'}), 400
+
+    # Check for the user in the Admin table
     admin = Admin.query.filter_by(email=email).first()
     if admin and check_password_hash(admin.password, password):
-        return jsonify({"success": True, "role": "admin"}), 200
+        return jsonify({'success': True, 'role': 'admin', 'message': 'Login successful!'}), 200
 
-    # If no user is found or password is incorrect
-    return jsonify({"success": False, "message": "Invalid credentials"}), 401
+    # Check for the user in the Professional table
+    professional = Professional.query.filter_by(email=email).first()
+    if professional and check_password_hash(professional.password, password):
+        return jsonify({'success': True, 'role': 'professional', 'message': 'Login successful!'}), 200
 
-# Route to fetch all services
-@app.route('/api/services', methods=['GET'])
-def get_services():
-    services = Service.query.all()
-    return jsonify([service.as_dict() for service in services])
+    # Check for the user in the Customer table
+    customer = Customer.query.filter_by(email=email).first()
+    if customer and check_password_hash(customer.password, password):
+        return jsonify({'success': True, 'role': 'customer', 'message': 'Login successful!'}), 200
 
-# Route to fetch professionals based on service id
-@app.route('/api/professionals/<int:service_id>', methods=['GET'])
-def get_professionals(service_id):
-    professionals = Professional.query.filter_by(service_name=service_id).all()
-    return jsonify([professional.as_dict() for professional in professionals])
+    # If no match is found
+    return jsonify({'success': False, 'message': 'Invalid credentials. Please try again.'}), 401
 
-# Route to fetch service history of a customer
-@app.route('/api/service-history', methods=['GET'])
-def get_service_history():
-    customer_id = request.args.get('customer_id')  # You can get customer_id from the session or request
-    service_history = ServiceRequest.query.filter_by(customer_id=customer_id).all()
-    return jsonify([service.as_dict() for service in service_history])
 
-# Route to book a service (create a service request)
+@app.route('/api/get_professional/<int:service_id>', methods=['GET'])
+def get_professionals_byid(service_id):
+    professionals = Professional.query.filter_by(service_id=service_id).all()
+    return jsonify([{
+        'professional_id': pro.professional_id,
+        'professional_name': pro.full_name,
+        'service_id': pro.service_id,
+        'experience': pro.experience,
+        'address': pro.address,
+        'pincode': pro.pincode,
+        'email': pro.email
+    } for pro in professionals])
+
+
 @app.route('/api/book-service', methods=['POST'])
 def book_service():
     data = request.get_json()
     new_request = ServiceRequest(
         service_id=data['service_id'],
+        customer_id=data['customer_id'],
         professional_id=data['professional_id'],
-        customer_id=1,  # This should come from the logged-in user
-        date_of_request=datetime.utcnow(),
+        date_of_request=datetime.now().date()
     )
     db.session.add(new_request)
     db.session.commit()
-    return jsonify({"message": "Service booked successfully"}), 201
+    return jsonify({'message': 'Service booked successfully'}), 200
 
-# Route to close a service request
 @app.route('/api/close-service', methods=['POST'])
 def close_service():
     data = request.get_json()
-    service_request = ServiceRequest.query.filter_by(service_id=data['service_id']).first()
+    service_request = ServiceRequest.query.get(data['service_id'])
     if service_request:
         service_request.service_status = 'completed'
+        service_request.date_of_completion = datetime.now().date()
         db.session.commit()
-        return jsonify({"message": "Service closed successfully"})
-    return jsonify({"error": "Service not found"}), 404
+        return jsonify({'message': 'Service closed successfully'}), 200
+    return jsonify({'message': 'Service not found'}), 404
+
+
+@app.route('/api/get_service_history', methods=['GET'])
+def get_service_history_for_cust():
+    customer_id = request.args.get('customer_id')  # Pass the customer ID via query parameter
+    requests = ServiceRequest.query.filter_by(customer_id=customer_id).all()
+    return jsonify([{
+        'service_name': req.service_name,
+        'professional_name': req.professional_name,
+        'email': req.email,
+        'status': req.service_status
+    } for req in requests])
+
 
 
 # Route to get customer profile
@@ -298,48 +371,10 @@ def logout():
     session.pop('customer_id', None)  # Clear the session
     return jsonify({'message': 'Logged out successfully'}), 200
 
-# Route to update customer information (example for updating address)
-@app.route('/api/customer/update', methods=['PUT'])
-def update_customer():
-    customer_id = session.get('customer_id')
-    if not customer_id:
-        return jsonify({'error': 'Not logged in'}), 401
-    
-    customer = Customer.query.filter_by(customer_id=customer_id).first()
-    if not customer:
-        return jsonify({'error': 'Customer not found'}), 404
-    
-    data = request.json
-    if 'address' in data:
-        customer.address = data['address']
-    
-    db.session.commit()
-    return jsonify({'message': 'Profile updated successfully'}), 200
 
-# Route to get all service requests for a customer (joins customer and service tables)
-@app.route('/api/customer/requests', methods=['GET'])
-def get_service_requests():
-    customer_id = session.get('customer_id')
-    if not customer_id:
-        return jsonify({'error': 'Not logged in'}), 401
-    
-    requests = db.session.query(ServiceRequest, Service).join(Service, ServiceRequest.service_id == Service.service_id) \
-        .filter(ServiceRequest.customer_id == customer_id).all()
-    
-    response_data = []
-    for request, service in requests:
-        response_data.append({
-            'service_name': service.service_name,
-            'date_of_request': request.date_of_request,
-            'service_status': request.service_status
-        })
-    
-    return jsonify(response_data), 200
-
-@app.route('/api/register', methods=['POST'])
+@app.route('/api/customer_register', methods=['POST'])
 def register_customer():
     data = request.get_json()
-
     # Validate incoming data
     required_fields = ['email', 'password', 'fullname', 'address', 'pincode']
     for field in required_fields:
@@ -351,7 +386,7 @@ def register_customer():
         return jsonify({"error": "Email already registered"}), 400
 
     # Hash the password before storing
-    hashed_password = generate_password_hash(data['password'], method='sha256')
+    hashed_password = generate_password_hash(data['password'])
 
     new_customer = Customer(
         email=data['email'],
@@ -369,73 +404,8 @@ def register_customer():
         db.session.rollback()
         return jsonify({"error": "Error saving customer details. Please try again."}), 500
 
-# Customer Login Route
-@app.route('/api/login', methods=['POST'])
-def login_customer():
-    data = request.get_json()
 
-    if 'email' not in data or 'password' not in data:
-        return jsonify({"error": "Email and password are required."}), 400
-
-    customer = Customer.query.filter_by(email=data['email']).first()
-
-    if not customer or not check_password_hash(customer.password, data['password']):
-        return jsonify({"error": "Invalid email or password."}), 401
-
-    return jsonify({"message": "Login successful!"}), 200
-
-# Service Request Route (for registered customers to request services)
-@app.route('/api/request-service', methods=['POST'])
-def request_service():
-    data = request.get_json()
-
-    # Validate incoming data
-    if 'customer_id' not in data or 'service_id' not in data:
-        return jsonify({"error": "Missing customer_id or service_id"}), 400
-
-    customer = Customer.query.get(data['customer_id'])
-    if not customer:
-        return jsonify({"error": "Customer not found."}), 404
-
-    service = Service.query.get(data['service_id'])
-    if not service:
-        return jsonify({"error": "Service not found."}), 404
-
-    service_request = ServiceRequest(
-        service_id=service.service_id,
-        customer_id=customer.customer_id,
-        date_of_request=datetime.now().date()
-    )
-
-    try:
-        db.session.add(service_request)
-        db.session.commit()
-        return jsonify({"message": "Service request submitted successfully!"}), 201
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({"error": "Error submitting service request."}), 500
-
-@app.route('/api/service/<int:service_id>', methods=['GET'])
-def get_service(service_id):
-    service = db.session.query(Service).filter(Service.service_id == service_id).first()
-    if service:
-        # Get service details along with related professional info
-        service_details = db.session.query(Service, Professional).join(Professional, Professional.service_name == Service.service_name).filter(Service.service_id == service_id).first()
-
-        if service_details:
-            service_data = {
-                'service_id': service_details.Service.service_id,
-                'service_name': service_details.Service.service_name,
-                'professional_name': service_details.Professional.full_name,
-                'base_price': service_details.Service.base_price,
-                'description': service_details.Service.description,
-                'time_required': service_details.Service.time_required
-            }
-            return jsonify(service_data)
-        return jsonify({'message': 'Professional not found for this service'}), 404
-    return jsonify({'message': 'Service not found'}), 404
-
-@app.route('/api/service/remarks', methods=['POST'])
+@app.route('/api/customer_remarks', methods=['POST'])
 def submit_remarks():
     data = request.json
     service_id = data.get('service_id')
@@ -481,8 +451,8 @@ def submit_remarks():
 
     return jsonify({'message': 'Remarks submitted successfully'}), 200
 
-@app.route('/search', methods=['GET'])
-def search():
+@app.route('/customer_search', methods=['GET'])
+def customer_search():
     search_by = request.args.get('search_by', 'service_name')
     search_input = request.args.get('search_input', '')
     
@@ -514,8 +484,8 @@ def search():
     return jsonify(search_results)
 
 # Booking Route
-@app.route('/book', methods=['POST'])
-def book_service():
+@app.route('/customer_book', methods=['POST'])
+def customer_book_service():
     data = request.get_json()
     professional_id = data.get('professional_id')
     service_name = data.get('service_name')
@@ -542,24 +512,18 @@ def book_service():
     return jsonify({'message': f'Service request for {professional_name} booked successfully'}), 201
 
 # Get Professional Details
-@app.route('/professional/<int:professional_id>', methods=['GET'])
-def get_professional_details(professional_id):
-    professional = Professional.query.filter_by(professional_id=professional_id).first()
-
-    if not professional:
-        return jsonify({'error': 'Professional not found'}), 404
-
-    # Return the professional details
-    professional_details = {
-        'full_name': professional.full_name,
-        'service_name': professional.service_name,
-        'experience': professional.experience,
-        'address': professional.address,
-        'pincode': professional.pincode,
-        'email': professional.email
-    }
-
-    return jsonify(professional_details)
+@app.route('/api/get_professional/<int:service_id>', methods=['GET'])
+def get_professionals_by_id_prof(service_id):
+    professionals = Professional.query.filter_by(service_id=service_id).all()
+    return jsonify([{
+        'professional_id': pro.professional_id,
+        'professional_name': pro.full_name,
+        'service_name': pro.service_name,
+        'experience': pro.experience,
+        'address': pro.address,
+        'pincode': pro.pincode,
+        'email': pro.email
+    } for pro in professionals])    
 
 @app.route('/api/service-history/<int:customer_id>', methods=['GET'])
 def get_service_history(customer_id):
@@ -588,7 +552,7 @@ def get_service_history(customer_id):
 
 # Professional Routes
 
-@app.route('/api/profile', methods=['GET'])
+@app.route('/api/professional_profile', methods=['GET'])
 def get_profile():
     # Get the profile of the logged-in professional
     professional_id = request.args.get('professional_id')
@@ -606,27 +570,7 @@ def get_profile():
         }), 200
     return jsonify({'error': 'Profile not found'}), 404
 
-@app.route('/api/profile', methods=['PUT'])
-def edit_profile():
-    # Edit the profile of the logged-in professional
-    professional_id = request.json.get('professional_id')
-    professional = Professional.query.filter_by(professional_id=professional_id).first()
-
-    if professional:
-        professional.full_name = request.json.get('full_name', professional.full_name)
-        professional.service_name = request.json.get('service_name', professional.service_name)
-        professional.experience = request.json.get('experience', professional.experience)
-        professional.address = request.json.get('address', professional.address)
-        professional.pincode = request.json.get('pincode', professional.pincode)
-        professional.status = request.json.get('status', professional.status)
-        professional.date_updated = datetime.utcnow()
-
-        db.session.commit()
-
-        return jsonify({'message': 'Profile updated successfully'}), 200
-    return jsonify({'error': 'Profile not found'}), 404
-
-@app.route('/api/today-services', methods=['GET'])
+@app.route('/api/professional/today-services', methods=['GET'])
 def get_today_services():
     # Get services for today with customer and professional info (if any)
     today = datetime.utcnow().date()
@@ -651,7 +595,7 @@ def get_today_services():
     
     return jsonify(services_data), 200
 
-@app.route('/api/accept-service', methods=['POST'])
+@app.route('/api/professional/accept-service', methods=['POST'])
 def accept_service():
     # Accept a service request
     request_id = request.json.get('request_id')
@@ -665,7 +609,7 @@ def accept_service():
         return jsonify({'message': 'Service accepted successfully'}), 200
     return jsonify({'error': 'Service request not found or already accepted'}), 404
 
-@app.route('/api/reject-service', methods=['POST'])
+@app.route('/api/professional/reject-service', methods=['POST'])
 def reject_service():
     # Reject a service request
     request_id = request.json.get('request_id')
@@ -678,7 +622,7 @@ def reject_service():
         return jsonify({'message': 'Service rejected successfully'}), 200
     return jsonify({'error': 'Service request not found or already processed'}), 404
 
-@app.route('/api/closed-services', methods=['GET'])
+@app.route('/api/professional/closed-services', methods=['GET'])
 def get_closed_services():
     # Get closed services with customer and professional info (if any)
     closed_services = db.session.query(ServiceRequest, Customer, Professional, Review).join(
@@ -704,56 +648,8 @@ def get_closed_services():
     
     return jsonify(services_data), 200
 
-@app.route('/api/professional/<int:professional_id>', methods=['PUT'])
-def update_professional_profile(professional_id):
-    """
-    Route to update professional profile data.
-    """
-    # Get the logged-in user (In this example, it's assumed you use session or JWT for authentication)
-    # This should be checked with proper authentication and authorization
-    logged_in_professional_id = session.get('professional_id')  # Or from JWT
-    if logged_in_professional_id != professional_id:
-        return jsonify({"message": "Unauthorized"}), 403
 
-    # Fetch the professional data from the database
-    professional = Professional.query.get(professional_id)
-    if not professional:
-        return jsonify({"message": "Professional not found"}), 404
-
-    # Get data from the request
-    data = request.json
-    if 'full_name' in data:
-        professional.full_name = data['full_name']
-    if 'service_name' in data:
-        professional.service_name = data['service_name']
-    if 'experience' in data:
-        professional.experience = data['experience']
-    if 'address' in data:
-        professional.address = data['address']
-    if 'pincode' in data:
-        professional.pincode = data['pincode']
-    
-    # Handle document upload (optional, if the file is uploaded)
-    document = data.get('document')
-    if document:
-        professional.document = document  # Save document (make sure it's properly handled as a file)
-
-    # Set the date_updated field to the current time
-    professional.date_updated = datetime.utcnow()
-
-    # Commit the changes to the database
-    try:
-        db.session.commit()
-        return jsonify({"message": "Profile updated successfully!"}), 200
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({"message": "Error updating profile, please try again."}), 500
-    
-# Helper function to check allowed file extensions
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
-
-@app.route('/update_profile/<int:professional_id>', methods=['PUT'])
+@app.route('/update_professional_profile/<int:professional_id>', methods=['PUT'])
 def update_professional_profile(professional_id):
     professional = Professional.query.get_or_404(professional_id)
 
@@ -777,7 +673,7 @@ def update_professional_profile(professional_id):
     # Handle file upload (document)
     if 'document' in request.files:
         file = request.files['document']
-        if file and allowed_file(file.filename):
+        if file:
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
@@ -808,32 +704,28 @@ def update_professional_profile(professional_id):
         db.session.rollback()
         return jsonify({'message': 'Error updating profile', 'error': str(e)}), 500
     
-@app.route('/api/register-professional', methods=['POST'])
+@app.route('/api/professional_register', methods=['POST'])
 def register_professional():
     # Extracting the form data from the request
     data = request.form
     email = data.get('email')
     password = data.get('password')
     full_name = data.get('fullname')
-    service_name = data.get('service_name')
-    experience = int(data.get('experience'))
+    service_id = data.get('service_id')
+    experience = data.get('experience')
     address = data.get('address')
     pincode = data.get('pincode')
 
     # Handling the document file
-    document = request.files.get('documents')
-    if document and allowed_file(document.filename):
-        filename = secure_filename(document.filename)
-        document_data = document.read()  # Reading the file content as binary data
-    else:
-        return jsonify({"error": "Invalid file format or no file uploaded"}), 400
+    document = request.files.get('document')
+    document_data = document.read() if document else None
 
     # Creating a new professional record
     new_professional = Professional(
         email=email,
-        password=password,  # Remember to hash the password in a real-world scenario
+        password=generate_password_hash(password),
         full_name=full_name,
-        service_name=service_name,
+        service_id=service_id,
         experience=experience,
         document=document_data,
         address=address,
@@ -849,20 +741,13 @@ def register_professional():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-
-# Route to handle user login (for demonstration purposes)
-@app.route('/api/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-
-    # Check if professional exists with the provided email and password
-    professional = Professional.query.filter_by(email=email, password=password).first()
-    if professional:
-        return jsonify({"message": "Login successful", "professional_id": professional.professional_id}), 200
-    else:
-        return jsonify({"error": "Invalid credentials"}), 401
+    
+@app.route('/api/get_services_for_prof_regis', methods=['GET'])
+def get_services_for_prof_regis():
+    services = Service.query.all()  # Assuming you have a Service model
+    return jsonify({
+        'services': [{'service_id': service.service_id, 'service_name': service.service_name} for service in services]
+    })
 
 @app.route('/professional_search', methods=['GET'])
 def professional_search():
@@ -911,7 +796,7 @@ def professional_search():
 
     return jsonify(search_results)
 
-@app.route('/api/reviews-ratings', methods=['GET'])
+@app.route('/api/professional/reviews-ratings', methods=['GET'])
 def get_reviews_ratings():
     try:
         # Query to get average ratings and count per rating level
@@ -937,8 +822,8 @@ def get_reviews_ratings():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/service-requests', methods=['GET'])
-def get_service_requests():
+@app.route('/api/professional/service-requests', methods=['GET'])
+def professional_get_service_requests():
     try:
         # Query to get service requests count by status
         service_requests = db.session.query(
@@ -956,7 +841,7 @@ def get_service_requests():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/api/professional/<int:professional_id>', methods=['GET'])
+@app.route('/api/view_professional/<int:professional_id>', methods=['GET'])
 def get_professional(professional_id):
     try:
         # Query the Professional data with the provided ID

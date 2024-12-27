@@ -37,7 +37,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import instance from '@/axios.js'; // Import the Axios instance
 import Chart from 'chart.js/auto'; 
 import ProfessionalNavbar from '@/components/ProfessionalNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
@@ -60,12 +60,12 @@ export default {
     async fetchData() {
       try {
         // Fetch ratings data from the Flask API
-        const reviewsResponse = await axios.get('/api/reviews-ratings');
+        const reviewsResponse = await instance.get('professional/reviews-ratings');
         const { ratingsData } = reviewsResponse.data;
         this.ratingsData = ratingsData;
 
         // Fetch service requests data from the Flask API
-        const serviceRequestsResponse = await axios.get('/api/service-requests');
+        const serviceRequestsResponse = await instance.get('professional/service-requests');
         const { serviceRequestsData } = serviceRequestsResponse.data;
         this.serviceRequestsData = serviceRequestsData;
 

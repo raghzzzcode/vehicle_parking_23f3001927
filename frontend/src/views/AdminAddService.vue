@@ -73,7 +73,7 @@
 <script>
 import AdminNavbar from '@/components/AdminNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
-import axios from 'axios';
+import instance from '@/axios.js';
 
 export default {
   name: 'AdminAddService',
@@ -93,16 +93,20 @@ export default {
   },
   methods: {
     async submitForm() {
-      try {
-        const response = await axios.post('/api/services', this.service);
-        console.log('Service Added:', response.data);
-        alert('Service added successfully!');
-        this.resetForm();
-      } catch (error) {
-        console.error('Error adding service:', error.response?.data || error.message);
-        alert('Failed to add service. Please try again.');
-      }
-    },
+  try {
+    const response = await instance.post('add_service', this.service);
+    console.log('Service Added:', response.data);
+    alert('Service added successfully!');
+    
+    // Redirect to admin dashboard after successful service addition
+    this.$router.push({ name: 'admin_dashboard' });
+
+    this.resetForm();
+  } catch (error) {
+    console.error('Error adding service:', error.response?.data || error.message);
+    alert('Failed to add service. Please try again.');
+  }
+},
     resetForm() {
       this.service = {
         service_name: '',

@@ -76,7 +76,7 @@
 <script>
 import AdminNavbar from "@/components/AdminNavbar.vue";
 import AppFooter from "@/components/AppFooter.vue";
-import axios from "axios";
+import instance from '@/axios.js'; // Importing axios instance
 
 export default {
   components: {
@@ -86,7 +86,7 @@ export default {
   data() {
     return {
       service: {
-        service_id: 1, // Example ID, should be dynamically fetched
+        service_id: null,  // Initially null, will be set dynamically
         service_name: "",
         base_price: 0,
         description: "",
@@ -95,24 +95,44 @@ export default {
     };
   },
   mounted() {
-    this.fetchServiceDetails();
+    this.fetchServiceDetails();  // Fetch service details when component is mounted
   },
+
   methods: {
+    // Fetch service details using service ID passed in the URL
     async fetchServiceDetails() {
+      const serviceId = this.$route.params.id; // Get the service ID from the URL
+      if (!serviceId) {
+        alert("Service ID is missing");
+        return;
+      }
+      
       try {
-        // Fetch the service details based on service_id (Example URL)
-        const response = await axios.get(`/api/services/${this.service.service_id}`);
-        this.service = response.data;
+        // Make a GET request to fetch the service details
+        const response = await instance.get(`/get_service_basedon_id/${serviceId}`);
+        this.service = response.data;  // Set the service data from API response
       } catch (error) {
         console.error("Failed to fetch service details:", error.response?.data || error.message);
+        alert("Failed to load service details. Please try again.");
       }
     },
+
+    // Submit the form with updated service data
     async submitForm() {
+      const serviceId = this.service.service_id;
+      if (!serviceId) {
+        alert("Service ID is missing. Cannot update.");
+        return;
+      }
+
       try {
-        // Update service details (Example URL)
-        const response = await axios.put(`/api/services/${this.service.service_id}`, this.service);
+        // Send the updated service data using PUT request
+        const response = await instance.put(`/update_service/${serviceId}`, this.service);
         console.log("Service updated:", response.data);
         alert("Service updated successfully!");
+
+        // Redirect to admin dashboard after successful update
+        this.$router.push('/admin_dashboard');
       } catch (error) {
         console.error("Failed to update service:", error.response?.data || error.message);
         alert("Failed to update service. Please try again.");

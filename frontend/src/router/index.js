@@ -107,7 +107,7 @@ const routes = [
     component: AdminDashboard
   },
   {
-    path: '/admin_edit_service',
+    path: '/admin_edit_service/:id',
     name: 'admin_edit_service',
     component: AdminEditService
   },

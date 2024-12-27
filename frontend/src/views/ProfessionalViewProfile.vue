@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import instance from '@/axios.js';
 import ProfessionalNavbar from '@/components/ProfessionalNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
 
@@ -52,14 +52,16 @@ export default {
   },
   mounted() {
     // Fetch professional data when the component is mounted
-    const professionalId = 1; // Replace with dynamic value based on logged-in user
-    axios.get(`http://localhost:5000/api/professional/${professionalId}`)
-      .then(response => {
-        this.professional = response.data;
-      })
-      .catch(error => {
-        console.error('There was an error fetching the professional data:', error);
-      });
+    const professionalId = this.$route.params.professionalId; // Get dynamic ID from the route params
+    if (professionalId) {
+      instance.get(`view_professional/${professionalId}`)
+        .then(response => {
+          this.professional = response.data;
+        })
+        .catch(error => {
+          console.error('There was an error fetching the professional data:', error);
+        });
+    }
   }
 };
 </script>

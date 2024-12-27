@@ -101,7 +101,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import instance from '@/axios.js';
 import ProfessionalNavbar from '@/components/ProfessionalNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
 
@@ -125,7 +125,7 @@ export default {
   methods: {
     async fetchProfile() {
       try {
-        const response = await axios.get('/api/profile', {
+        const response = await instance.get('professional_profile', {
           params: { professional_id: 1 }  // Replace with actual professional ID
         });
         console.log('Profile:', response.data);
@@ -135,7 +135,7 @@ export default {
     },
     async fetchTodayServices() {
       try {
-        const response = await axios.get('/api/today-services');
+        const response = await instance.get('professional/today-services');
         this.todayServices = response.data;
       } catch (error) {
         console.error('Error fetching today\'s services:', error);
@@ -143,7 +143,7 @@ export default {
     },
     async fetchClosedServices() {
       try {
-        const response = await axios.get('/api/closed-services');
+        const response = await instance.get('professional/closed-services');
         this.closedServices = response.data;
       } catch (error) {
         console.error('Error fetching closed services:', error);
@@ -151,7 +151,7 @@ export default {
     },
     async acceptService(serviceId) {
       try {
-        const response = await axios.post('/api/accept-service', {
+        const response = await instance.post('professional/accept-service', {
           request_id: serviceId,
           professional_id: 1  // Replace with actual professional ID
         });
@@ -163,7 +163,7 @@ export default {
     },
     async rejectService(serviceId) {
       try {
-        const response = await axios.post('/api/reject-service', {
+        const response = await instance.post('professional/reject-service', {
           request_id: serviceId
         });
         console.log('Service rejected:', response.data);

@@ -55,7 +55,7 @@
 <script>
 import AppNavbar from '@/components/AppNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
-import axios from 'axios';  // Import axios for making HTTP requests
+import instance from '@/axios.js';
 
 export default {
   name: 'AllLogin',
@@ -72,26 +72,33 @@ export default {
   },
   methods: {
     async handleLogin() {
-      try {
-        const response = await axios.post('http://localhost:5000/login', {
-          email: this.email,
-          password: this.password
-        });
+  try {
+    const response = await instance.post('login', {
+      email: this.email,
+      password: this.password
+    });
 
-        if (response.data.success) {
-          this.messages.push({ category: 'success', text: 'Login successful!' });
-          // Redirect to the appropriate dashboard or page
-          this.$router.push('/dashboard');  // Change '/dashboard' to your actual dashboard route
-        } else {
-          this.messages.push({ category: 'danger', text: 'Invalid credentials. Please try again.' });
-        }
-      } catch (error) {
-        this.messages.push({ category: 'danger', text: 'An error occurred while logging in. Please try again.' });
+    if (response.data.success) {
+      this.messages.push({ category: 'success', text: 'Login successful!' });
+      
+      // Check the role and redirect accordingly
+      const role = response.data.role;
+      if (role === 'admin') {
+        this.$router.push('/admin_dashboard');
+      } else if (role === 'customer') {
+        this.$router.push('/customer_dashboard');
+      } else if (role === 'professional') {
+        this.$router.push('/professional_dashboard');
       }
-    },
-    closeMessage(index) {
-      this.messages.splice(index, 1);
+    } else {
+      this.messages.push({ category: 'danger', text: 'Invalid credentials. Please try again.' });
     }
+  } catch (error) {
+    console.error(error);
+    this.messages.push({ category: 'danger', text: 'An error occurred while logging in. Please try again.' });
+  }
+}
+
   }
 };
 </script>

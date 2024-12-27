@@ -33,7 +33,7 @@
 <script>
 import { ref, onMounted } from "vue";
 import Chart from "chart.js/auto";
-import axios from "axios";
+import instance from '@/axios.js';
 import AdminNavbar from "@/components/AdminNavbar.vue";
 import AppFooter from "@/components/AppFooter.vue";
 
@@ -48,7 +48,7 @@ export default {
 
     const fetchRatingsData = async () => {
       try {
-        const response = await axios.get("/api/reviews/ratings-summary");
+        const response = await instance.get("ratings-summary");
         ratingsData.value = response.data; // Assumes response format matches { "5": x, "4": y, ... }
       } catch (error) {
         console.error("Error fetching ratings data:", error);
@@ -57,7 +57,7 @@ export default {
 
     const fetchServiceRequestsData = async () => {
       try {
-        const response = await axios.get("/api/requests/service-summary");
+        const response = await instance.get("service-summary");
         serviceRequestsData.value = response.data; // Assumes response format matches { "Received": x, ... }
       } catch (error) {
         console.error("Error fetching service requests data:", error);

@@ -74,7 +74,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import instance from '@/axios.js';
 import ProfessionalNavbar from '@/components/ProfessionalNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
 
@@ -93,7 +93,7 @@ export default {
   methods: {
     async performSearch() {
       try {
-        const response = await axios.get(`/professional_search`, {
+        const response = await instance.get(`professional_search`, {
           params: {
             searchBy: this.searchBy,
             searchText: this.searchText,
