@@ -1,6 +1,7 @@
 <template>
   <div>
     <ProfessionalNavbar />
+
     <!-- Search Section -->
     <div class="container mb-5">
       <h3 class="text-center mb-3" style="color: #004aad;">Search</h3>
@@ -11,7 +12,11 @@
           <div class="col-md-4">
             <div class="mb-3">
               <label for="searchBy" class="form-label" style="color: #004aad;">Search By:</label>
-              <select class="form-select" v-model="searchBy" aria-label="Search By" style="background-color: #e9f2fb; color: #004aad;">
+              <select
+                class="form-select"
+                v-model="searchBy"
+                aria-label="Search By"
+                style="background-color: #e9f2fb; color: #004aad;">
                 <option value="date">Date</option>
                 <option value="location">Location</option>
                 <option value="pincode">Pincode</option>
@@ -19,14 +24,26 @@
               </select>
             </div>
           </div>
+
           <div class="col-md-4">
             <div class="mb-3">
               <label for="searchText" class="form-label" style="color: #004aad;">Search Text:</label>
-              <input type="text" class="form-control" v-model="searchText" placeholder="Enter search text" style="background-color: #e9f2fb; color: #004aad;">
+              <input
+                type="text"
+                class="form-control"
+                v-model="searchText"
+                placeholder="Enter search text"
+                style="background-color: #e9f2fb; color: #004aad;">
             </div>
           </div>
+
           <div class="col-md-1 d-flex align-items-center">
-            <button type="submit" class="btn" style="background-color: #004aad; color: white; border: none; height: 40px; margin-top: 15px;">Search</button>
+            <button
+              type="submit"
+              class="btn"
+              style="background-color: #004aad; color: white; border: none; height: 40px; margin-top: 15px;">
+              Search
+            </button>
           </div>
         </div>
       </form>
@@ -93,15 +110,26 @@ export default {
   methods: {
     async performSearch() {
       try {
-        const response = await instance.get(`professional_search`, {
+        const professionalEmail = localStorage.getItem('professional_email'); // Fetch the email from localStorage
+
+        if (!professionalEmail) {
+          alert('Please log in first.');
+          return;
+        }
+
+        const response = await instance.get('professional_search', {
           params: {
+            professional_email: professionalEmail, // Pass the email as a parameter
             searchBy: this.searchBy,
             searchText: this.searchText,
           },
         });
+        console.log(response.data);
         this.searchResults = response.data;
       } catch (error) {
         console.error('Error fetching search results:', error);
+        // Display an error message to the user
+        alert('An error occurred while fetching search results.');
       }
     },
   },

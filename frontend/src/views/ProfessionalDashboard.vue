@@ -36,6 +36,7 @@
               <th>Customer Name</th>
               <th>Email</th>
               <th>Location</th>
+              <th>Status</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -45,17 +46,21 @@
               <td>{{ service.customer_name }}</td>
               <td>{{ service.email }}</td>
               <td>{{ service.location }}</td>
+              <td>{{ service.status }}</td>
               <td>
-                <form @submit.prevent="acceptService(service.id)" style="display:inline;">
+                <form @submit.prevent="acceptService(service.id)" style="display:inline;" v-if="service.status !== 'completed'">
                   <button type="submit" class="btn btn-outline-primary btn-sm">Accept</button>
                 </form>
-                <form @submit.prevent="rejectService(service.id)" style="display:inline;">
+                <form @submit.prevent="rejectService(service.id)" style="display:inline;" v-if="service.status !== 'completed'">
                   <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
+                </form>
+                <form @submit.prevent="closeService(service.id)" style="display:inline;" v-if="service.status === 'completed'">
+                  <button type="submit" class="btn btn-outline-success btn-sm">Close</button>
                 </form>
               </td>
             </tr>
             <tr v-if="!todayServices.length">
-              <td colspan="5" class="text-center">No services available today.</td>
+              <td colspan="6" class="text-center">No services available today.</td>
             </tr>
           </tbody>
         </table>
@@ -135,28 +140,44 @@ export default {
     },
     async fetchTodayServices() {
       try {
-        const response = await instance.get('professional/today-services');
-        this.todayServices = response.data;
+        const response = await instance.get('professional/today-services', {
+          params: { professional_email: localStorage.getItem('professional_email') }
+        });
+        
+        if (response.status === 200) {
+          this.todayServices = response.data;
+        } else {
+          console.error('No services found for today:', response.data.error);
+        }
       } catch (error) {
-        console.error('Error fetching today\'s services:', error);
+        console.error('Error fetching today\'s services:', error.response?.data?.error || error.message);
       }
     },
     async fetchClosedServices() {
       try {
-        const response = await instance.get('professional/closed-services');
-        this.closedServices = response.data;
+        const response = await instance.get('professional/closed-services', {
+          params: { professional_email: localStorage.getItem('professional_email') }
+        });
+        
+        if (response.status === 200) {
+          this.closedServices = response.data;
+        } else {
+          console.error('No closed services available:', response.data.error);
+        }
       } catch (error) {
-        console.error('Error fetching closed services:', error);
+        console.error('Error fetching closed services:', error.response?.data?.error || error.message);
       }
     },
     async acceptService(serviceId) {
       try {
         const response = await instance.post('professional/accept-service', {
           request_id: serviceId,
-          professional_id: 1  // Replace with actual professional ID
+          professional_email: localStorage.getItem('professional_email')  
         });
         console.log('Service accepted:', response.data);
-        this.fetchTodayServices();  // Refresh the services list
+
+        // Remove the accepted service from todayServices directly
+        this.todayServices = this.todayServices.filter(service => service.id !== serviceId);
       } catch (error) {
         console.error('Error accepting service:', error);
       }
@@ -167,9 +188,22 @@ export default {
           request_id: serviceId
         });
         console.log('Service rejected:', response.data);
-        this.fetchTodayServices();  // Refresh the services list
+
+        // Remove the rejected service from todayServices directly
+        this.todayServices = this.todayServices.filter(service => service.id !== serviceId);
       } catch (error) {
         console.error('Error rejecting service:', error);
+      }
+    },
+    async closeService(serviceId) {
+      try {
+        const response = await instance.post('professional/close-service', {
+          request_id: serviceId
+        });
+        console.log('Service closed:', response.data);
+        this.fetchClosedServices();  // Refresh the closed services list
+      } catch (error) {
+        console.error('Error closing service:', error);
       }
     }
   }

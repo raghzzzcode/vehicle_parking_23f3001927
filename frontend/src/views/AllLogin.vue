@@ -86,8 +86,10 @@ export default {
       if (role === 'admin') {
         this.$router.push('/admin_dashboard');
       } else if (role === 'customer') {
+        localStorage.setItem('customer_email', this.email);
         this.$router.push('/customer_dashboard');
       } else if (role === 'professional') {
+        localStorage.setItem('professional_email', this.email);
         this.$router.push('/professional_dashboard');
       }
     } else {

@@ -66,21 +66,32 @@ export default {
   },
   methods: {
     async fetchCustomerProfile() {
-      try {
-        const response = await instance.get('customer/profile');
-        this.customer = response.data;
-      } catch (error) {
-        console.error("Error fetching customer profile:", error);
-      }
-    },
-    async logout() {
-      try {
-        await instance.post('logout');
-        this.$router.push('/login');
-      } catch (error) {
-        console.error("Logout error:", error);
-      }
+  try {
+    const email = localStorage.getItem('customer_email');
+    if (!email) {
+      console.error('Customer email not found in localStorage.');
+      return;
     }
+    
+    const response = await instance.get(`customer/profile?customer_email=${email}`);
+    this.customer = {
+      email: response.data.email || '',
+      fullName: response.data.full_name || '',
+      address: response.data.address || '',
+      pincode: response.data.pincode || ''
+    };
+  } catch (error) {
+    console.error("Error fetching customer profile:", error);
+  }
+},
+async logout() {
+  try {
+    await instance.post('logout'); // Perform the logout API call
+    this.$router.push('/logout'); // Navigate to the 'logout' route
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+}
   }
 };
 </script>

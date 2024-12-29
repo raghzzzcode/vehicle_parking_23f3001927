@@ -6,7 +6,7 @@ db = SQLAlchemy()
 
 # Customer Table
 class Customer(db.Model):
-    customer_id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, primary_key=True)   
     email = db.Column(db.String(255), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255), nullable=False)
@@ -48,11 +48,11 @@ class Service(db.Model):
 class ServiceRequest(db.Model):
     request_id = db.Column(db.Integer, primary_key=True)
     service_id = db.Column(db.Integer, db.ForeignKey('service.service_id'), nullable=False)  # Foreign key to Service
-    customer_id = db.Column(db.Integer, db.ForeignKey('customer.customer_id'), nullable=False)  # Foreign key to Customer
+    customer_email = db.Column(db.String(255), db.ForeignKey('customer.email'), nullable=False)  # Foreign key to Customer
     professional_id = db.Column(db.Integer, db.ForeignKey('professional.professional_id'), nullable=True)  # Foreign key to Professional
     date_of_request = db.Column(db.Date, nullable=False)
     date_of_completion = db.Column(db.Date, nullable=True)
-    service_status = db.Column(Enum('requested', 'assigned', 'completed', name='service_status'), default='requested')
+    service_status = db.Column(Enum('requested', 'assigned', 'completed','rejected', name='service_status'), default='requested')
     remarks = db.Column(db.Text, nullable=True)
 
 # Review Table 

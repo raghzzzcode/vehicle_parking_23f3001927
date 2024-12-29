@@ -47,10 +47,7 @@
                 <td>{{ result.address }}</td>
                 <td>{{ result.pincode }}</td>
                 <td>
-                  <form @submit.prevent="bookService(result.professional_id, result.service_name, result.full_name)">
-                    <input type="hidden" :value="result.professional_id" />
-                    <input type="hidden" :value="result.service_name" />
-                    <input type="hidden" :value="result.full_name" />
+                  <form @submit.prevent="bookService(result.professional_id, result.service_name)">
                     <button type="submit" class="btn btn-success book-btn">Book</button>
                   </form>
                 </td>
@@ -67,10 +64,11 @@
   </div>
 </template>
 
+
 <script>
 import CustomerNavbar from '@/components/CustomerNavbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
-import instance from '@/axios.js';  // Assuming instance is configured for API requests
+import instance from '@/axios.js';
 
 export default {
   components: {
@@ -86,10 +84,12 @@ export default {
   },
   computed: {
     searchTitle() {
-      if (this.searchBy === 'service_name') return 'Service Name Search Results';
-      if (this.searchBy === 'pin_code') return 'Pincode Search Results';
-      if (this.searchBy === 'location') return 'Location Search Results';
-      return 'Search Results';
+      const titles = {
+        service_name: 'Service Name Search Results',
+        pin_code: 'Pincode Search Results',
+        location: 'Location Search Results'
+      };
+      return titles[this.searchBy] || 'Search Results';
     }
   },
   methods: {
@@ -102,31 +102,32 @@ export default {
             search_input: this.searchInput
           }
         });
-        if (response.data.length > 0) {
-          this.searchResults = response.data;
-        } else {
-          this.searchResults = [];
-          alert('No results found.');
-        }
+        this.searchResults = response.data.length ? response.data : [];
+        if (!response.data.length) alert('No results found.');
       } catch (error) {
-        console.error('Error fetching search results:', error);
-        alert('An error occurred while searching.');
+        alert('No results found.');
       }
     },
 
     // Booking method to call the Flask API
-    async bookService(professional_id, service_name, professional_name) {
-      const customer_id = 123; // Replace with actual customer ID from session or auth
+    async bookService(professional_id, service_name) {
+      // Retrieve customer email from localStorage
+      const customer_email = localStorage.getItem('customer_email');
+      
+      if (!customer_email) {
+        alert('Customer email not found in localStorage.');
+        return;
+      }
+
       const data = {
-        professional_id,
-        service_name,
-        professional_name,
-        customer_id
+        service_name,  // Send service_id only
+        customer_email,  // Use the email from localStorage
+        professional_id  // Send professional_id
       };
 
       try {
-        const response = await instance.post('/customer_book', data);
-        alert(response.data.message);  // Show success message
+        const response = await instance.post('book-service', data);
+        alert(response.data.message); // Show success message
       } catch (error) {
         console.error('Error booking service:', error);
         alert('An error occurred while booking the service.');
@@ -135,6 +136,7 @@ export default {
   }
 };
 </script>
+
 
 <style scoped>
 /* Enhanced styling for search form and results */

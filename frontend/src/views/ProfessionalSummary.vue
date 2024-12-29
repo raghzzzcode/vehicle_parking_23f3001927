@@ -50,7 +50,8 @@ export default {
   data() {
     return {
       ratingsData: {}, // For storing ratings data
-      serviceRequestsData: {} // For storing service requests data
+      serviceRequestsData: {}, // For storing service requests data
+      professionalEmail: localStorage.getItem('professional_email')
     };
   },
   mounted() {
@@ -59,15 +60,22 @@ export default {
   methods: {
     async fetchData() {
       try {
-        // Fetch ratings data from the Flask API
-        const reviewsResponse = await instance.get('professional/reviews-ratings');
+        // Fetch ratings data from the Flask API with the professional's email
+        const reviewsResponse = await instance.get('professional/reviews-ratings', {
+          params: { email: this.professionalEmail }
+        });
         const { ratingsData } = reviewsResponse.data;
         this.ratingsData = ratingsData;
 
-        // Fetch service requests data from the Flask API
-        const serviceRequestsResponse = await instance.get('professional/service-requests');
+        // Fetch service requests data from the Flask API with the professional's email
+        const serviceRequestsResponse = await instance.get('professional/service-requests', {
+          params: { email: this.professionalEmail }
+        });
         const { serviceRequestsData } = serviceRequestsResponse.data;
         this.serviceRequestsData = serviceRequestsData;
+        
+        console.log('Ratings Data:', this.ratingsData);
+        console.log('Service Requests Data:', this.serviceRequestsData);
 
         // Initialize the charts after data is fetched
         this.initializeCharts();
@@ -76,6 +84,11 @@ export default {
       }
     },
     initializeCharts() {
+      // Destroy the existing ratings chart if it exists
+      if (this.ratingsChartInstance) {
+        this.ratingsChartInstance.destroy();
+      }
+
       // Prepare ratings chart data
       const ratingsChartData = [
         this.ratingsData['5'] || 0,
@@ -87,7 +100,7 @@ export default {
 
       // Circle chart for Ratings
       const ctxRatings = document.getElementById('ratingsChart').getContext('2d');
-      new Chart(ctxRatings, {
+      this.ratingsChartInstance = new Chart(ctxRatings, {
         type: 'doughnut',
         data: {
           labels: ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
@@ -111,20 +124,30 @@ export default {
         }
       });
 
+      // Destroy the existing service requests chart if it exists
+      if (this.serviceRequestsChartInstance) {
+        this.serviceRequestsChartInstance.destroy();
+      }
+
+      // Prepare service requests data
+      const serviceRequestsData = [
+        this.serviceRequestsData['Received'] || 0,
+        this.serviceRequestsData['Closed'] || 0,
+        this.serviceRequestsData['Requested'] || 0,
+        this.serviceRequestsData['Assigned'] || 0,
+        this.serviceRequestsData['Rejected'] || 0
+      ];
+
       // Bar chart for Service Requests
       const ctxRequests = document.getElementById('serviceRequestsChart').getContext('2d');
-      new Chart(ctxRequests, {
+      this.serviceRequestsChartInstance = new Chart(ctxRequests, {
         type: 'bar',
         data: {
-          labels: ['Received', 'Closed', 'Requested'],
+          labels: ['Received', 'Closed', 'Requested', 'Assigned', 'Rejected'],
           datasets: [{
             label: 'Service Requests',
-            data: [
-              this.serviceRequestsData['Received'] || 0,
-              this.serviceRequestsData['Closed'] || 0,
-              this.serviceRequestsData['Requested'] || 0
-            ],
-            backgroundColor: ['#17a2b8', '#28a745', '#dc3545'],
+            data: serviceRequestsData,
+            backgroundColor: ['#17a2b8', '#28a745', '#dc3545', '#ffc107', '#fd7e14'],
             borderColor: '#ffffff',
             borderWidth: 2
           }]
@@ -164,6 +187,7 @@ export default {
 
 .card {
   border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .doughnut-chart,
