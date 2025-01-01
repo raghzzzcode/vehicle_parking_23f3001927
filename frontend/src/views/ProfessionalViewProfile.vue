@@ -51,16 +51,23 @@ export default {
     };
   },
   mounted() {
-    // Fetch professional data when the component is mounted
-    const professionalId = this.$route.params.professionalId; // Get dynamic ID from the route params
-    if (professionalId) {
-      instance.get(`view_professional/${professionalId}`)
+    // Fetch the logged-in professional's email from localStorage
+    const loggedInEmail = localStorage.getItem('professional_email');
+    
+    if (loggedInEmail) {
+      // Fetch professional data using the email as a query parameter
+      instance
+        .get(`view_professional`, {
+          params: { email: loggedInEmail } // Pass email as query parameter
+        })
         .then(response => {
           this.professional = response.data;
         })
         .catch(error => {
           console.error('There was an error fetching the professional data:', error);
         });
+    } else {
+      console.error('No logged-in professional email found in localStorage.');
     }
   }
 };

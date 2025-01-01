@@ -1,7 +1,7 @@
 <template>
   <div>
     <ProfessionalNavbar />
-    
+
     <div class="container mt-5 d-flex justify-content-center align-items-center" style="min-height: 100vh;">
       <div class="card shadow-lg rounded" style="background: linear-gradient(135deg, #004aad, #0099ff); width: 100%; max-width: 600px; padding: 20px;">
         <div class="card-body text-white d-flex flex-column align-items-center">
@@ -91,70 +91,102 @@
 </template>
 
 <script>
-import instance from '@/axios.js'
-import ProfessionalNavbar from '@/components/ProfessionalNavbar.vue'
-import AppFooter from '@/components/AppFooter.vue'
+import instance from '@/axios.js';
+import ProfessionalNavbar from '@/components/ProfessionalNavbar.vue';
+import AppFooter from '@/components/AppFooter.vue';
 
 export default {
   name: 'ProfessionalEditProfile',
   components: {
     ProfessionalNavbar,
-    AppFooter
+    AppFooter,
   },
   data() {
     return {
       flashMessage: null,
       formData: {
-        email: 'professional@example.com',
+        email: '',
         password: '',
-        fullname: 'John Doe',
-        serviceName: 'Professional Service',
-        experience: 5,
-        address: '123 Main St',
-        pincode: '123456',
-        role: 'Professional',
-        status: 'Active'
+        fullname: '',
+        serviceName: '',
+        experience: '',
+        address: '',
+        pincode: '',
+        role: '',
+        status: '',
       },
-      document: null
-    }
+      document: null,
+    };
+  },
+  created() {
+    this.fetchProfileData();
   },
   methods: {
-    handleFileChange(event) {
-      this.document = event.target.files[0];
-    },
-    async updateProfile() {
-      // Prepare form data to send to the backend
-      const formData = new FormData();
-      formData.append('full_name', this.formData.fullname);
-      formData.append('service_name', this.formData.serviceName);
-      formData.append('experience', this.formData.experience);
-      formData.append('address', this.formData.address);
-      formData.append('pincode', this.formData.pincode);
-      if (this.document) {
-        formData.append('document', this.document);
-      }
-
-      // Send a PUT request to update the professional profile using axios
+    async fetchProfileData() {
       try {
-        const response = await instance.put(`update_professional_profile/${this.formData.professional_id}`, formData);
-
+        const response = await instance.get('view_professional', { params: { email: localStorage.getItem('professional_email') } });
         if (response.status === 200) {
-          this.flashMessage = {
-            type: 'success',
-            message: response.data.message,
+          this.formData = {
+            email: response.data.email,
+            fullname: response.data.fullName,
+            serviceName: response.data.serviceName,
+            experience: response.data.experience,
+            address: response.data.address,
+            pincode: response.data.pincode,
+            role: response.data.role,
+            status: response.data.status,
+            password: '', // Blank to avoid sending old password
           };
         } else {
-          throw new Error('Failed to update profile');
+          throw new Error('Failed to fetch profile data');
         }
       } catch (error) {
         this.flashMessage = {
           type: 'danger',
-          message: 'An error occurred while updating the profile.',
+          message: 'Unable to fetch profile data.',
         };
       }
+    },
+    handleFileChange(event) {
+      this.document = event.target.files[0];
+    },
+    async updateProfile() {
+  try {
+    // Construct the query parameters
+    const params = {
+      email: this.formData.email,
+      password: this.formData.password || '', // Allow password to be empty
+      full_name: this.formData.fullname,
+      service_name: this.formData.serviceName,
+      experience: this.formData.experience,
+      address: this.formData.address,
+      pincode: this.formData.pincode,
+    };
+    
+    // Send the request to update the profile
+    const response = await instance.put('update_professional_profile', null, { params });
+    
+    if (response.status === 200) {
+      this.flashMessage = {
+        type: 'success',
+        message: response.data.message,
+      };
+      alert('Profile updated successfully!');
+      setTimeout(() => {
+        this.$router.push('/professional_dashboard');
+      }, 2000);
+    } else {
+      throw new Error('Failed to update profile');
     }
+  } catch (error) {
+    this.flashMessage = {
+      type: 'danger',
+      message: 'An error occurred while updating the profile.',
+    };
   }
-}
+},
+  },
+};
 </script>
 
 <style scoped>

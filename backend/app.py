@@ -774,42 +774,52 @@ def get_closed_services():
     return jsonify({'error': 'No closed services found for this professional.'}), 404
 
 
+from datetime import datetime, timezone
 
-@app.route('/update_professional_profile/<int:professional_id>', methods=['PUT'])
-def update_professional_profile(professional_id):
-    professional = Professional.query.get_or_404(professional_id)
+from datetime import datetime, timezone
 
-    data = request.form
+@app.route('/api/update_professional_profile', methods=['PUT'])
+def update_professional_profile():
+    # Fetch the professional email from the request parameters (passed from front-end)
+    email = request.args.get('email')  # Using args instead of form
+    print(f"Updating profile for email: {email}")
+
+    # Query the Professional table based on email
+    professional = Professional.query.filter_by(email=email).first()
+
+    # Check if the professional exists
+    if not professional:
+        return jsonify({'message': 'Professional not found'}), 404
+
+    data = request.args  # Using request.args instead of request.form
+    
     # Handle updating non-document fields
     if 'email' in data:
         professional.email = data['email']
-    if 'password' in data:
-        professional.password = data['password']  # You can hash the password here if needed
+    if 'password' in data and data['password']:
+        professional.password = generate_password_hash(data['password'])
     if 'full_name' in data:
         professional.full_name = data['full_name']
+    
+    # Fetch the Service in advance to handle service update properly
+    service = None
     if 'service_name' in data:
-        professional.service_name = data['service_name']
+        service = Service.query.filter_by(service_name=data['service_name']).first()
+        if not service:
+            return jsonify({'message': 'Service not found'}), 404
+        professional.service_id = service.service_id
+    
     if 'experience' in data:
-        professional.experience = int(data['experience'])
+        professional.experience = data['experience']
     if 'address' in data:
         professional.address = data['address']
     if 'pincode' in data:
         professional.pincode = data['pincode']
     
-    # Handle file upload (document)
-    if 'document' in request.files:
-        file = request.files['document']
-        if file:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            # Store the file path or binary data in the database
-            with open(filepath, 'rb') as f:
-                professional.document = f.read()
+    # Optional: Handle document upload as base64 encoding or file upload if required.
     
-    # Update the date_updated field to the current time
-    professional.date_updated = datetime.utcnow()
+    # Update date_updated for auditing purposes
+    professional.date_updated = datetime.now(timezone.utc)
 
     try:
         db.session.commit()
@@ -818,17 +828,20 @@ def update_professional_profile(professional_id):
             'data': {
                 'email': professional.email,
                 'full_name': professional.full_name,
-                'service_name': professional.service_name,
+                'service_name': service.service_name if service else None,  # Ensure service exists
                 'experience': professional.experience,
                 'address': professional.address,
                 'pincode': professional.pincode,
-                'status': professional.status.name,
-                'role': professional.role.name
+                'status': professional.status,
+                'role': professional.role
             }
         }), 200
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({'message': 'Error updating profile', 'error': str(e)}), 500
+
+    
     
 @app.route('/api/professional_register', methods=['POST'])
 def register_professional():
@@ -1030,33 +1043,47 @@ def professional_get_service_requests():
 
 
 
-
-@app.route('/api/view_professional/<int:professional_id>', methods=['GET'])
-def get_professional(professional_id):
+# View Professional Profile
+@app.route('/api/view_professional', methods=['GET'])
+def get_professional_for_profile():
     try:
-        # Query the Professional data with the provided ID
-        professional = db.session.query(Professional).filter_by(professional_id=professional_id).first()
+        # Get the professional's email from the query parameters
+        professional_email = request.args.get('email')
+        print("professional_email:", professional_email)
+        
+        if not professional_email:
+            return jsonify({'message': 'Email parameter is missing'}), 400
+
+        # Query the Professional data with the provided email
+        professional = db.session.query(Professional, Service).join(Service, Professional.service_id == Service.service_id).filter(Professional.email == professional_email).first()
 
         if not professional:
             return jsonify({'message': 'Professional not found'}), 404
-        
-        # You can also join other tables if needed (like ServiceRequest)
-        # Example: joinedload(ServiceRequest)
+
+        professional_data, service_data = professional
+        print(professional_data)
+        print(service_data)
+        print(professional_data.full_name)
+        print(service_data.service_name)
+        # Construct the response data
         response_data = {
-            'fullName': professional.full_name,
-            'email': professional.email,
-            'serviceName': professional.service_name,
-            'experience': professional.experience,
-            'address': professional.address,
-            'pincode': professional.pincode,
-            'role': professional.role,
-            'status': professional.status,
+            'fullName': professional_data.full_name,
+            'email': professional_data.email,
+            'serviceName': service_data.service_name,
+            'experience': professional_data.experience,
+            'address': professional_data.address,
+            'pincode': professional_data.pincode,
+            'role': professional_data.role,
+            'status': professional_data.status,
         }
+        
 
         return jsonify(response_data), 200
 
     except Exception as e:
+        print(f"Error fetching professional data: {str(e)}")
         return jsonify({'message': 'Error fetching professional data', 'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':

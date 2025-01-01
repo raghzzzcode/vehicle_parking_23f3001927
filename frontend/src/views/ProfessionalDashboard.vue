@@ -12,13 +12,9 @@
               <h5 class="card-title" style="color: #004aad;">Profile</h5>
               <p class="card-text">View or edit your professional details below:</p>
               <div class="d-flex justify-content-between">
-                <form @submit.prevent="viewProfile">
-                  <button type="submit" class="btn btn-primary">View Profile</button>
-                </form>
-                <form @submit.prevent="editProfile">
-                  <button class="btn btn-outline-primary">Edit Profile</button>
-                </form>
-              </div>  
+                <router-link to="/professional_view_profile" class="btn btn-primary">View Profile</router-link>
+                <router-link to="/professional_edit_profile" class="btn btn-outline-primary">Edit Profile</router-link>
+              </div>
             </div>
           </div>
         </div>
@@ -123,27 +119,15 @@ export default {
     };
   },
   created() {
-    this.fetchProfile();
     this.fetchTodayServices();
     this.fetchClosedServices();
   },
   methods: {
-    async fetchProfile() {
-      try {
-        const response = await instance.get('professional_profile', {
-          params: { professional_id: 1 }  // Replace with actual professional ID
-        });
-        console.log('Profile:', response.data);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      }
-    },
     async fetchTodayServices() {
       try {
         const response = await instance.get('professional/today-services', {
           params: { professional_email: localStorage.getItem('professional_email') }
         });
-        
         if (response.status === 200) {
           this.todayServices = response.data;
         } else {
@@ -158,7 +142,6 @@ export default {
         const response = await instance.get('professional/closed-services', {
           params: { professional_email: localStorage.getItem('professional_email') }
         });
-        
         if (response.status === 200) {
           this.closedServices = response.data;
         } else {
@@ -167,48 +150,11 @@ export default {
       } catch (error) {
         console.error('Error fetching closed services:', error.response?.data?.error || error.message);
       }
-    },
-    async acceptService(serviceId) {
-      try {
-        const response = await instance.post('professional/accept-service', {
-          request_id: serviceId,
-          professional_email: localStorage.getItem('professional_email')  
-        });
-        console.log('Service accepted:', response.data);
-
-        // Remove the accepted service from todayServices directly
-        this.todayServices = this.todayServices.filter(service => service.id !== serviceId);
-      } catch (error) {
-        console.error('Error accepting service:', error);
-      }
-    },
-    async rejectService(serviceId) {
-      try {
-        const response = await instance.post('professional/reject-service', {
-          request_id: serviceId
-        });
-        console.log('Service rejected:', response.data);
-
-        // Remove the rejected service from todayServices directly
-        this.todayServices = this.todayServices.filter(service => service.id !== serviceId);
-      } catch (error) {
-        console.error('Error rejecting service:', error);
-      }
-    },
-    async closeService(serviceId) {
-      try {
-        const response = await instance.post('professional/close-service', {
-          request_id: serviceId
-        });
-        console.log('Service closed:', response.data);
-        this.fetchClosedServices();  // Refresh the closed services list
-      } catch (error) {
-        console.error('Error closing service:', error);
-      }
     }
   }
 };
 </script>
+
 
 <style scoped>
 /* Button and Table Styling */
