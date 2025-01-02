@@ -12,17 +12,24 @@ import os
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from sqlalchemy.exc import SQLAlchemyError
-
-
+import redis
+from flask_caching import Cache
+from flask import Flask, current_app
+from celery import Celery
+from celery_config import make_celery
 
 app = Flask(__name__)   
 app.secret_key = secrets.token_hex(16)
+celery = make_celery(app)
+cache = Cache(app)
 
 # Configuration for the database
 app.config['SQLALCHEMY_DATABASE_URI'] = r"sqlite:///C:/Users/hp/Desktop/household_services_final.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads/'  # Directory where documents will be uploaded
 app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'docx', 'jpg', 'jpeg', 'png'}
+app.config['CACHE_TYPE'] = 'redis'
+app.config['CACHE_REDIS_URL'] = "redis://localhost:6379/0"  # Default Redis URL
 
 # Initialize the database
 db.init_app(app)
@@ -41,7 +48,7 @@ CORS(app, resources={r"/*": {"origins": "http://localhost:8000"}})
 def home():
     return "Welcome to the Home Page!"
 
-
+@cache.cached(timeout=600)
 @app.route('/api/get_services', methods=['GET'])
 def get_services():
     services = Service.query.all()
@@ -113,6 +120,7 @@ def delete_professional(id):
         return jsonify({'message': 'Professional deleted successfully'}), 200
     return jsonify({'error': 'Professional not found'}), 404
 
+@cache.cached(timeout=600)
 @app.route('/api/get_service_requests', methods=['GET'])
 def get_service_requests():
     try:
@@ -327,7 +335,7 @@ def admin_search():
     }), 200
 
 
-
+@cache.cached(timeout=600)
 @app.route('/api/ratings-summary', methods=['GET'])
 def get_ratings_summary():
     ratings_summary = db.session.query(
@@ -343,6 +351,7 @@ def get_ratings_summary():
 
     return jsonify(ratings_data)
 
+@cache.cached(timeout=600)
 @app.route('/api/service-summary', methods=['GET'])
 def get_service_requests_summary():
     # Query to fetch all service requests
@@ -532,7 +541,7 @@ def insert_review():
 
     return jsonify({'message': 'Review inserted successfully'}), 200
 
-
+@cache.cached(timeout=600)
 @app.route('/api/get_service_history', methods=['GET'])
 def get_service_history_for_cust():
     customer_email = request.args.get('customer_email')  # Get the customer email from query parameter
@@ -552,7 +561,7 @@ def get_service_history_for_cust():
         'status': req[0].service_status  # Accessing service_status from the ServiceRequest table
     } for req in requests])
 
-
+@cache.cached(timeout=600)
 # Route to get customer profile
 @app.route('/api/customer/profile', methods=['GET'])
 def get_customer_profile():
@@ -725,7 +734,7 @@ def get_service_history(customer_id):
     })
 
 # Professional Routes
-
+@cache.cached(timeout=600)
 @app.route('/api/professional_profile', methods=['GET'])
 def get_profile():
     # Get the profile of the logged-in professional
@@ -751,6 +760,8 @@ def get_profile():
         return jsonify(response), 200
     
     return jsonify({'error': 'Profile not found'}), 404
+
+@cache.cached(timeout=600)
 @app.route('/api/professional/today-services', methods=['GET'])
 def get_today_services():
     professional_email = request.args.get('professional_email')
@@ -830,7 +841,7 @@ def reject_service():
     return jsonify({'error': 'Service request not found or already processed'}), 404
 
 
-
+@cache.cached(timeout=600)
 @app.route('/api/professional/closed-services', methods=['GET'])
 def get_closed_services():
     professional_email = request.args.get('professional_email')
@@ -880,7 +891,6 @@ def get_closed_services():
 
 from datetime import datetime, timezone
 
-from datetime import datetime, timezone
 
 @app.route('/api/update_professional_profile', methods=['PUT'])
 def update_professional_profile():
@@ -1065,7 +1075,7 @@ def professional_search():
 
     return jsonify(search_results)
 
-
+@cache.cached(timeout=600)
 @app.route('/api/professional/reviews-ratings', methods=['GET'])
 def get_reviews_ratings():
     try:
@@ -1103,6 +1113,7 @@ def get_reviews_ratings():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@cache.cached(timeout=600)
 @app.route('/api/professional/service-requests', methods=['GET'])
 def professional_get_service_requests():
     try:
@@ -1150,6 +1161,7 @@ def professional_get_service_requests():
 
 
 # View Professional Profile
+@cache.cached(timeout=600)
 @app.route('/api/view_professional', methods=['GET'])
 def get_professional_for_profile():
     try:
@@ -1190,6 +1202,237 @@ def get_professional_for_profile():
         print(f"Error fetching professional data: {str(e)}")
         return jsonify({'message': 'Error fetching professional data', 'error': str(e)}), 500
 
+
+import smtplib
+from email.mime.text import MIMEText
+
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def send_daily_reminder():
+    """
+    Function to send daily reminders to service professionals about pending service requests.
+    """
+    with app.app_context():
+        # Fetch all professionals with pending service requests
+        pending_requests = (
+            db.session.query(ServiceRequest, Professional)
+            .join(Professional, ServiceRequest.professional_id == Professional.professional_id)
+            .filter(ServiceRequest.service_status.in_(['requested', 'assigned']),
+                    Professional.blocked_or_not == False)
+            .all()
+        )
+        
+        # Prepare reminders
+        reminders = {}
+        for request, professional in pending_requests:
+            if professional.email not in reminders:
+                reminders[professional.email] = []
+            reminders[professional.email].append({
+                "service_id": request.service_id,
+                "date_of_request": request.date_of_request,
+                "remarks": request.remarks,
+            })
+        
+        # Send reminders via email
+        smtp_host = "smtp.gmail.com"  # Replace with your SMTP server
+        smtp_port = 587  # Replace with your SMTP port
+        sender_email = "raghvigupta8888@gmail.com"  # Replace with your email
+        sender_password = "@ivhgaR25"  # Replace with your email password   
+
+        for professional_email, service_requests in reminders.items():
+            subject = "Daily Reminder: Pending Service Requests"
+            body = f"Dear Professional,\n\nYou have the following pending service requests:\n\n"
+            for service in service_requests:
+                body += f"- Service ID: {service['service_id']}, Requested on: {service['date_of_request']}, Remarks: {service['remarks']}\n"
+            body += "\nPlease take action as soon as possible.\n\nThank you."
+
+            # Email setup
+            try:
+                msg = MIMEText(body)
+                msg["Subject"] = subject
+                msg["From"] = sender_email
+                msg["To"] = professional_email
+
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.starttls()
+                    server.login(sender_email, sender_password)
+                    server.sendmail(sender_email, professional_email, msg.as_string())
+                logger.info(f"Reminder sent to {professional_email}")
+            except Exception as e:
+                logger.error(f"Failed to send reminder to {professional_email}: {e}")
+
+
+@celery.task(bind=True, default_retry_delay=300, max_retries=5)
+def send_daily_reminder_task(self):
+    try:
+        send_daily_reminder()
+    except Exception as e:
+        logger.error(f"Task failed: {e}")
+        self.retry(exc=e)
+
+# Schedule the task
+from celery import Celery
+from celery.schedules import crontab
+
+celery.conf.beat_schedule = {
+    'send-daily-reminder': {
+        'task': 'send_daily_reminder_task',
+        'schedule': crontab(hour=18, minute=0),  # Every day at 6:00 PM
+    },
+}
+
+from fpdf import FPDF
+import os
+from flask import current_app
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+from datetime import timedelta
+
+def generate_monthly_report():
+    """
+    Generates a monthly activity report as a PDF for customers and sends it via email.
+    """
+    with app.app_context():
+        # Fetch customer activity data for the past month
+        reports = (
+            db.session.query(Customer, ServiceRequest)
+            .join(ServiceRequest, ServiceRequest.customer_id == Customer.customer_id)
+            .filter(ServiceRequest.date_of_request.between(
+                datetime.now().replace(day=1) - timedelta(days=1),
+                datetime.now().replace(day=1)
+            ))
+            .all()
+        )
+
+        # Group data by customer
+        customer_reports = {}
+        for customer, service in reports:
+            if customer.email not in customer_reports:
+                customer_reports[customer.email] = []
+            customer_reports[customer.email].append({
+                "service_id": service.service_id,
+                "status": service.service_status,
+                "date_of_request": service.date_of_request,
+                "remarks": service.remarks
+            })
+
+        # Send reports
+        smtp_host = "smtp.gmail.com"
+        smtp_port = 587
+        sender_email = "raghvigupta8888@gmail.com"
+        sender_password = "@ivhgaR25"
+
+        for email, services in customer_reports.items():
+            # Create PDF
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, txt="Monthly Activity Report", ln=True, align='C')
+            pdf.ln(10)
+
+            pdf.cell(200, 10, txt=f"Customer: {email}", ln=True)
+            pdf.ln(5)
+            pdf.cell(200, 10, txt="Service Details:", ln=True)
+
+            for service in services:
+                pdf.cell(200, 10, txt=f"- Service ID: {service['service_id']}, "
+                                      f"Status: {service['status']}, "
+                                      f"Requested On: {service['date_of_request']}, "
+                                      f"Remarks: {service['remarks']}", ln=True)
+            pdf_file = f"{email}_monthly_report.pdf"
+            pdf_path = os.path.join(current_app.config['EXPORT_DIR'], pdf_file)
+            pdf.output(pdf_path)
+
+            # Send email with PDF attachment
+            try:
+                msg = MIMEMultipart()
+                msg["Subject"] = "Monthly Activity Report"
+                msg["From"] = sender_email
+                msg["To"] = email
+
+                # Email body
+                body = "Dear Customer,\n\nPlease find attached your activity report for the past month.\n\nThank you."
+                msg.attach(MIMEText(body, 'plain'))
+
+                # Attach PDF
+                attachment = open(pdf_path, "rb")
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f"attachment; filename={pdf_file}")
+                msg.attach(part)
+
+                # Send email
+                with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    server.starttls()
+                    server.login(sender_email, sender_password)
+                    server.sendmail(sender_email, email, msg.as_string())
+                logger.info(f"Monthly report sent to {email}")
+            except Exception as e:
+                logger.error(f"Failed to send report to {email}: {e}")
+
+@celery.task
+def send_monthly_report():
+    generate_monthly_report()
+
+celery.conf.beat_schedule = {
+    'send-monthly-report': {
+        'task': 'send_monthly_report',
+        'schedule': crontab(day_of_month=1, hour=0, minute=0)  # First day of every month at midnight
+    },
+}
+
+import csv
+import os
+from flask import current_app
+
+def export_closed_requests(professional_id):
+    """
+    Exports closed service requests for a professional as a CSV.
+    """
+    with app.app_context():
+        # Fetch service requests
+        services = (
+            db.session.query(ServiceRequest)
+            .filter(ServiceRequest.professional_id == professional_id,
+                    ServiceRequest.service_status == 'closed')
+            .all()
+        )
+
+        # CSV file generation
+        csv_file = f"closed_requests_{professional_id}.csv"
+        file_path = os.path.join(current_app.config['EXPORT_DIR'], csv_file)
+
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Service ID', 'Customer ID', 'Professional ID', 'Date of Request', 'Remarks'])
+            for service in services:
+                writer.writerow([
+                    service.service_id,
+                    service.customer_id,
+                    service.professional_id,
+                    service.date_of_request,
+                    service.remarks
+                ])
+
+        logger.info(f"CSV export completed: {file_path}")
+        return file_path
+
+@celery.task(bind=True)
+def export_as_csv_task(self, professional_id):
+    try:
+        file_path = export_closed_requests(professional_id)
+        # Notify completion (e.g., via email or logging)
+        logger.info(f"CSV export completed for Professional ID {professional_id}: {file_path}")
+    except Exception as e:
+        logger.error(f"Failed to export CSV: {e}")
+        raise self.retry(exc=e)
 
 
 if __name__ == '__main__':
