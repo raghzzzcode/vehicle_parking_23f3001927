@@ -62,38 +62,34 @@
         <table class="table table-striped table-hover shadow rounded">
           <thead style="background-color: #d9eaf7; color: #084298;">
             <tr>
-              <th v-if="searchBy === 'services' || searchBy === 'service_requests'">Service ID</th>
-              <th v-if="searchBy === 'services'">Service Name</th>
-              <th v-if="searchBy === 'services'">Base Price</th>
-              <th v-if="searchBy === 'services'">Description</th>
-              <th v-if="searchBy === 'service_requests'">Service Name</th>
-              <th v-if="searchBy === 'service_requests'">Assigned Professional</th>
-              <th v-if="searchBy === 'service_requests'">Requested Date</th>
-              <th v-if="searchBy === 'service_requests'">Status</th>
-              <th v-if="searchBy === 'customers'">Customer Name</th>
-              <th v-if="searchBy === 'customers'">Address</th>
-              <th v-if="searchBy === 'customers'">Pincode</th>
               <th v-if="searchBy === 'professionals'">Professional Name</th>
               <th v-if="searchBy === 'professionals'">Experience</th>
               <th v-if="searchBy === 'professionals'">Service Provided</th>
+              <th v-if="searchBy === 'professionals'">Blocked Status</th>
+              <th v-if="searchBy === 'professionals'">Action</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(result, index) in searchResults" :key="index" style="background-color: #f9f9f9; color: #333;">
-              <td v-if="searchBy === 'services' || searchBy === 'service_requests'">{{ result.service_id || 'N/A' }}</td>
-              <td v-if="searchBy === 'services'">{{ result.service_name }}</td>
-              <td v-if="searchBy === 'services'">${{ result.base_price }}</td>
-              <td v-if="searchBy === 'services'">{{ result.status || 'N/A' }}</td>
-              <td v-if="searchBy === 'service_requests'">{{ result.service_name || 'N/A' }}</td>
-              <td v-if="searchBy === 'service_requests'">{{ result.assigned_professional || 'N/A' }}</td>
-              <td v-if="searchBy === 'service_requests'">{{ result.requested_date }}</td>
-              <td v-if="searchBy === 'service_requests'">{{ result.status || 'N/A' }}</td>
-              <td v-if="searchBy === 'customers'">{{ result.customer_name }}</td>
-              <td v-if="searchBy === 'customers'">{{ result.address }}</td>
-              <td v-if="searchBy === 'customers'">{{ result.pincode }}</td>
+            <tr
+              v-for="(result, index) in searchResults"
+              :key="index"
+              style="background-color: #f9f9f9; color: #333;"
+            >
               <td v-if="searchBy === 'professionals'">{{ result.professional_name }}</td>
               <td v-if="searchBy === 'professionals'">{{ result.experience }}</td>
               <td v-if="searchBy === 'professionals'">{{ result.service_provided }}</td>
+              <td v-if="searchBy === 'professionals'">
+                {{ result.is_blocked ? "Blocked" : "Unblocked" }}
+              </td>
+              <td v-if="searchBy === 'professionals'">
+                <button
+                  @click="toggleBlock(result.professional_id)"
+                  class="btn"
+                  :class="result.is_blocked ? 'btn-danger' : 'btn-success'"
+                >
+                  {{ result.is_blocked ? "Unblock" : "Block" }}
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -107,7 +103,7 @@
 </template>
 
 <script>
-import instance from '@/axios.js';
+import instance from "@/axios.js";
 import AdminNavbar from "@/components/AdminNavbar.vue";
 import AppFooter from "@/components/AppFooter.vue";
 
@@ -147,21 +143,54 @@ export default {
           },
         });
         this.searchResults = response.data.results;
-        console.log(response.data.results);
+
+        // Fetch blocked status for professionals
+        if (this.searchBy === "professionals" && this.searchResults.length) {
+          await this.fetchBlockedStatus();
+        }
       } catch (error) {
         console.error("Error fetching search results:", error);
       }
     },
+    async fetchBlockedStatus() {
+      try {
+        const promises = this.searchResults.map(async (professional) => {
+          const response = await instance.get("get_blocked_or_not", {
+            params: { professional_id: professional.professional_id },
+          });
+          professional.is_blocked = response.data.blocked_or_not;
+        });
+        await Promise.all(promises);
+      } catch (error) {
+        console.error("Error fetching blocked status:", error);
+      }
+    },
+    async toggleBlock(professionalId) {
+      try {
+        const professional = this.searchResults.find(
+          (p) => p.professional_id === professionalId
+        );
+        const action = professional.is_blocked ? "unblock" : "block";
+
+        await instance.patch("change_blocking_status", {
+          professional_id: professionalId,
+          action,
+        });
+
+        // Update the blocked status
+        professional.is_blocked = !professional.is_blocked;
+      } catch (error) {
+        console.error("Error toggling block status:", error);
+      }
+    },
   },
   watch: {
-  // Watch for changes in 'searchBy'
-  searchBy() {
-    // Reset the search results when the search type changes
-    this.searchResults = [];
-    this.searchText = ''; // Optionally, clear the search text as well
-  }
-},
-
+    searchBy() {
+      // Reset the search results and search text when searchBy changes
+      this.searchResults = [];
+      this.searchText = "";
+    },
+  },
 };
 </script>
 

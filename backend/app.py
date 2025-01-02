@@ -211,6 +211,33 @@ def update_service(service_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/get_blocked_or_not', methods=['GET'])
+def get_blocked_or_not():
+    professional_id = request.args.get('professional_id', type=int)
+    professional = Professional.query.get(professional_id)
+    print(professional)
+    if professional:
+        return jsonify({
+            'professional_id': professional.professional_id,
+            'blocked_or_not': professional.blocked_or_not
+        })
+    else:
+        return jsonify({'message': 'Professional not found'}), 404
+    
+@app.route('/api/change_blocking_status', methods=['PATCH'])
+def change_blocking_status():
+    professional_id = request.json.get('professional_id')
+    professional = Professional.query.get(professional_id)
+    if professional:
+        professional.blocked_or_not = not professional.blocked_or_not
+        db.session.commit()
+        return jsonify({
+            'professional_id': professional.professional_id,
+            'new_blocked_status': professional.blocked_or_not
+        })
+    else:
+        return jsonify({'message': 'Professional not found'}), 404
+
 
 @app.route("/api/admin_search", methods=["GET"])
 def admin_search():
@@ -285,6 +312,7 @@ def admin_search():
         # Serialize only relevant fields for professionals
         serialized_results = [
             {
+                "professional_id": result.Professional.professional_id,
                 "professional_name": result.Professional.full_name,
                 "experience": result.Professional.experience,
                 "service_provided": result.Service.service_name,  # Accessing service_name from the joined Service table
@@ -292,7 +320,7 @@ def admin_search():
             }
             for result in results
         ]
-
+        
     return jsonify({
         "results": serialized_results,
         "total": total_results
@@ -386,7 +414,7 @@ def get_professionals_byid(service_id):
         Professional.email,
         Service.service_name
     ).join(Service, Professional.service_id == Service.service_id)\
-     .filter(Professional.service_id == service_id)\
+     .filter(Professional.service_id == service_id,Professional.blocked_or_not == 0,Professional.status=='approved')\
      .all()
 
     # Serialize the data into a JSON-compatible format
@@ -588,21 +616,21 @@ def customer_search():
         results = (
             db.session.query(Professional, Service)
             .join(Service, Professional.service_id == Service.service_id)
-            .filter(Service.service_name.ilike(f'%{search_input}%'))
+            .filter(Service.service_name.ilike(f'%{search_input}%',Professional.status=='approved',Professional.blocked_or_not==0))
             .all()
         )
     elif search_by == 'pin_code':
         results = (
             db.session.query(Professional, Service)
             .join(Service, Professional.service_id == Service.service_id)
-            .filter(Professional.pincode.like(f'%{search_input}%'))
+            .filter(Professional.pincode.like(f'%{search_input}%',Professional.status=='approved',Professional.blocked_or_not==0))
             .all()
         )
     elif search_by == 'location':
         results = (
             db.session.query(Professional, Service)
             .join(Service, Professional.service_id == Service.service_id)
-            .filter(Professional.address.ilike(f'%{search_input}%'))
+            .filter(Professional.address.ilike(f'%{search_input}%',Professional.status=='approved',Professional.blocked_or_not==0)) 
             .all()
         )
     else:

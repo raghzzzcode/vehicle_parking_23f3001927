@@ -29,6 +29,7 @@ class Professional(db.Model):
     role = db.Column(Enum('professional', name='role'), default='professional')
     date_created = db.Column(db.DateTime, nullable=False)
     date_updated = db.Column(db.DateTime, nullable=False)
+    blocked_or_not = db.Column(db.Boolean, default=False)
 
 # Admin Table
 class Admin(db.Model):

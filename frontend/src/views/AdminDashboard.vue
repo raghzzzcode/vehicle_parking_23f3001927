@@ -39,43 +39,57 @@
       </div>
 
       <!-- Professionals Section -->
-<h3 class="text-center mb-4" style="color: #003366;">Professionals</h3>
-<table class="table table-striped table-hover shadow rounded">
-  <thead style="background-color: #b3d9ff; color: #003366;">
-    <tr>
-      <th>ID</th>
-      <th>Name</th>
-      <th>Experience (Yrs)</th>
-      <th>Service ID</th>  <!-- Updated column name -->
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr v-for="(professional, index) in professionals" :key="professional.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
-      <td><a style="color: #004aad;">{{ professional.id }}</a></td>
-      <td>{{ professional.name }}</td>
-      <td>{{ professional.experience }}</td>
-      <td>{{ professional.serviceid }}</td>  <!-- Updated to display serviceid -->
-      <td>
-        <span v-if="professional.status && professional.status !== 'pending'" class="badge bg-secondary">{{ professional.status }}</span>
-        
-        <!-- Show these actions only if the status is "pending" -->
-        <template v-if="professional.status === 'pending'">
-          <form @submit.prevent="approveProfessional(professional.id)" style="display:inline;">
-            <button type="submit" class="btn btn-outline-success btn-sm">Approve</button>
-          </form>
-          <form @submit.prevent="rejectProfessional(professional.id)" style="display:inline;">
-            <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
-          </form>
-          <form @submit.prevent="deleteProfessional(professional.id)" style="display:inline;">
-            <button type="submit" class="btn btn-outline-warning btn-sm">Delete</button>
-          </form>
-        </template>
-      </td>
-    </tr>
-  </tbody>
-</table>
+      <h3 class="text-center mb-4" style="color: #003366;">Professionals</h3>
+      <table class="table table-striped table-hover shadow rounded">
+        <thead style="background-color: #b3d9ff; color: #003366;">
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Experience (Yrs)</th>
+            <th>Service ID</th>
+            <th>Block Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(professional, index) in professionals" :key="professional.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
+            <td><a style="color: #004aad;">{{ professional.id }}</a></td>
+            <td>{{ professional.name }}</td>
+            <td>{{ professional.experience }}</td>
+            <td>{{ professional.serviceid }}</td>
+            <td>
+              <button 
+                v-if="professional.isBlocked" 
+                class="btn btn-outline-success btn-sm" 
+                @click="toggleBlockStatus(professional.id, false)">
+                Unblock
+              </button>
+              <button 
+                v-else 
+                class="btn btn-outline-danger btn-sm" 
+                @click="toggleBlockStatus(professional.id, true)">
+                Block
+              </button>
+            </td>
+            <td>
+              <span v-if="professional.status && professional.status !== 'pending'" class="badge bg-secondary">{{ professional.status }}</span>
 
+              <!-- Show these actions only if the status is "pending" -->
+              <template v-if="professional.status === 'pending'">
+                <form @submit.prevent="approveProfessional(professional.id)" style="display:inline;">
+                  <button type="submit" class="btn btn-outline-success btn-sm">Approve</button>
+                </form>
+                <form @submit.prevent="rejectProfessional(professional.id)" style="display:inline;">
+                  <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
+                </form>
+                <form @submit.prevent="deleteProfessional(professional.id)" style="display:inline;">
+                  <button type="submit" class="btn btn-outline-warning btn-sm">Delete</button>
+                </form>
+              </template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       <!-- Service Requests Section -->
       <h3 class="text-center mb-4" style="color: #003366;">Service Requests</h3>
@@ -133,14 +147,23 @@ export default {
     },
 
     async fetchProfessionals() {
-      try {
-        const response = await instance.get('get_professionals');
-        this.professionals = response.data;  // Ensure serviceid is populated here
-      } catch (error) {
-        console.error('Error fetching professionals:', error);
-      }
-    },
+    try {
+      const response = await instance.get('get_professionals');
+      const professionals = response.data;
 
+      // Fetch block status for each professional
+      for (const professional of professionals) {
+        const blockStatusResponse = await instance.get('get_blocked_or_not', {
+          params: { professional_id: professional.id }
+        });
+        professional.isBlocked = blockStatusResponse.data.blocked_or_not;
+      }
+
+      this.professionals = professionals;
+    } catch (error) {
+      console.error('Error fetching professionals:', error);
+    }
+  },
     async fetchServiceRequests() {
       try {
         const response = await instance.get('get_service_requests');
@@ -190,7 +213,22 @@ export default {
       } catch (error) {
         console.error('Error deleting professional:', error);
       }
+    },
+
+    async toggleBlockStatus(id) {
+    try {
+      const response = await instance.patch('change_blocking_status', {
+        professional_id: id
+      });
+
+      const professional = this.professionals.find(p => p.id === id);
+      professional.isBlocked = response.data.new_blocked_status;
+
+      console.log(`Professional with ID ${id} blocking status changed to ${response.data.new_blocked_status}`);
+    } catch (error) {
+      console.error(`Error toggling block status for professional with ID ${id}:`, error);
     }
+  }
   },
   created() {
     this.fetchServices();
