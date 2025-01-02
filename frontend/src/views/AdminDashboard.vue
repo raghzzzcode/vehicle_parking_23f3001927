@@ -17,7 +17,7 @@
         </thead>
         <tbody>
           <tr v-for="(service, index) in services" :key="service.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
-            <td><a href="#" style="color: #004aad;">{{ service.id }}</a></td>
+            <td><a style="color: #004aad;">{{ service.id }}</a></td>
             <td>{{ service.name }}</td>
             <td>${{ service.basePrice }}</td>
             <td>
@@ -52,7 +52,7 @@
   </thead>
   <tbody>
     <tr v-for="(professional, index) in professionals" :key="professional.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
-      <td><a href="#" style="color: #004aad;">{{ professional.id }}</a></td>
+      <td><a style="color: #004aad;">{{ professional.id }}</a></td>
       <td>{{ professional.name }}</td>
       <td>{{ professional.experience }}</td>
       <td>{{ professional.serviceid }}</td>  <!-- Updated to display serviceid -->
@@ -85,12 +85,12 @@
             <th>Service ID</th>
             <th>Assigned Professional (if any)</th>
             <th>Service Name</th>
-            <th>Status (R/C)</th>
+            <th>Status (Req/Com/Assi/Rej)</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(request, index) in serviceRequests" :key="request.id" :style="{ backgroundColor: index % 2 === 0 ? '#f4faff' : '#ffffff' }">
-            <td><a href="#" style="color: #004aad;">{{ request.id }}</a></td>
+            <td><a style="color: #004aad;">{{ request.id }}</a></td>
             <td>{{ request.professional || 'N/A' }}</td>
             <td>{{ request.serviceName }}</td>
             <td>{{ request.status || 'N/A' }}</td>

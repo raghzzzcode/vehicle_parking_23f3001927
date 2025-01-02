@@ -7,6 +7,14 @@
     <div class="container-fluid mb-5">
       <h3 class="text-center mb-4" style="color: #004aad; font-weight: 600;">Search</h3>
 
+      <!-- Dynamic Search Instruction Message -->
+      <p class="text-center" style="font-weight: 500; color: #888;">
+        <span v-if="searchBy === 'services'">Services will be searched based on Service Name.</span>
+        <span v-if="searchBy === 'service_requests'">Service Requests will be searched based on Service Status.</span>
+        <span v-if="searchBy === 'customers'">Customers will be searched based on Full Name.</span>
+        <span v-if="searchBy === 'professionals'">Professionals will be searched based on Full Name.</span>
+      </p>
+
       <!-- Search Form -->
       <form @submit.prevent="submitSearch">
         <div class="row justify-content-center align-items-center">
@@ -57,10 +65,11 @@
               <th v-if="searchBy === 'services' || searchBy === 'service_requests'">Service ID</th>
               <th v-if="searchBy === 'services'">Service Name</th>
               <th v-if="searchBy === 'services'">Base Price</th>
-              <th v-if="searchBy === 'services'">Status</th>
+              <th v-if="searchBy === 'services'">Description</th>
+              <th v-if="searchBy === 'service_requests'">Service Name</th>
               <th v-if="searchBy === 'service_requests'">Assigned Professional</th>
               <th v-if="searchBy === 'service_requests'">Requested Date</th>
-              <th v-if="searchBy === 'service_requests'">Status (R/A/C)</th>
+              <th v-if="searchBy === 'service_requests'">Status</th>
               <th v-if="searchBy === 'customers'">Customer Name</th>
               <th v-if="searchBy === 'customers'">Address</th>
               <th v-if="searchBy === 'customers'">Pincode</th>
@@ -75,39 +84,19 @@
               <td v-if="searchBy === 'services'">{{ result.service_name }}</td>
               <td v-if="searchBy === 'services'">${{ result.base_price }}</td>
               <td v-if="searchBy === 'services'">{{ result.status || 'N/A' }}</td>
-              <td v-if="searchBy === 'service_requests'">{{ result.assigned_prof || 'N/A' }}</td>
-              <td v-if="searchBy === 'service_requests'">{{ result.req_date }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.service_name || 'N/A' }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.assigned_professional || 'N/A' }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.requested_date }}</td>
               <td v-if="searchBy === 'service_requests'">{{ result.status || 'N/A' }}</td>
-              <td v-if="searchBy === 'customers'">{{ result.full_name }}</td>
+              <td v-if="searchBy === 'customers'">{{ result.customer_name }}</td>
               <td v-if="searchBy === 'customers'">{{ result.address }}</td>
               <td v-if="searchBy === 'customers'">{{ result.pincode }}</td>
-              <td v-if="searchBy === 'professionals'">{{ result.full_name }}</td>
+              <td v-if="searchBy === 'professionals'">{{ result.professional_name }}</td>
               <td v-if="searchBy === 'professionals'">{{ result.experience }}</td>
-              <td v-if="searchBy === 'professionals'">{{ result.service_name }}</td>
+              <td v-if="searchBy === 'professionals'">{{ result.service_provided }}</td>
             </tr>
           </tbody>
         </table>
-
-        <!-- Pagination Section -->
-        <div class="d-flex justify-content-between align-items-center mt-4">
-          <button
-            class="btn btn-outline-primary"
-            :disabled="currentPage === 1"
-            @click="prevPage"
-          >
-            Previous
-          </button>
-          <p class="mb-0" style="color: #004aad; font-weight: 500;">
-            Page {{ currentPage }} of {{ totalPages }}
-          </p>
-          <button
-            class="btn btn-outline-primary"
-            :disabled="currentPage === totalPages"
-            @click="nextPage"
-          >
-            Next
-          </button>
-        </div>
       </div>
       <p v-else class="text-center" style="font-weight: 500; color: #888;">No results found for your search.</p>
     </div>
@@ -132,9 +121,6 @@ export default {
       searchBy: "services", // Default search option
       searchText: "",
       searchResults: [], // Will be fetched from the backend
-      totalResults: 0,  // Store the total number of results
-      currentPage: 1,   // Track the current page
-      resultsPerPage: 10, // Default results per page
     };
   },
   computed: {
@@ -150,9 +136,6 @@ export default {
       }
       return "Search Results";
     },
-    totalPages() {
-      return Math.ceil(this.totalResults / this.resultsPerPage);
-    },
   },
   methods: {
     async submitSearch() {
@@ -161,29 +144,24 @@ export default {
           params: {
             by: this.searchBy,
             text: this.searchText,
-            page: this.currentPage,  // Include pagination params
-            per_page: this.resultsPerPage,
           },
         });
         this.searchResults = response.data.results;
-        this.totalResults = response.data.total;  // Set the total results
+        console.log(response.data.results);
       } catch (error) {
         console.error("Error fetching search results:", error);
       }
     },
-    nextPage() {
-      if (this.currentPage < this.totalPages) {
-        this.currentPage += 1;
-        this.submitSearch();
-      }
-    },
-    prevPage() {
-      if (this.currentPage > 1) {
-        this.currentPage -= 1;
-        this.submitSearch();
-      }
-    },
   },
+  watch: {
+  // Watch for changes in 'searchBy'
+  searchBy() {
+    // Reset the search results when the search type changes
+    this.searchResults = [];
+    this.searchText = ''; // Optionally, clear the search text as well
+  }
+},
+
 };
 </script>
 

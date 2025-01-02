@@ -118,6 +118,13 @@ export default {
           console.error("Error fetching services:", error);
         });
     },
+    handleFileUpload(event) {
+      // Handle file input manually
+      const file = event.target.files[0];
+      if (file) {
+        this.form.documents = file;
+      }
+    },
     handleRegister() {
       if (
         this.form.email &&
@@ -125,50 +132,61 @@ export default {
         this.form.fullname &&
         this.form.service_id &&
         this.form.experience &&
-        this.form.documents &&
         this.form.address &&
-        this.form.pincode
+        this.form.pincode &&
+        this.form.documents // Ensure that the file is checked
       ) {
-        // Send form data as-is, no conversion to number needed
-        let formData = new FormData();
-        formData.append('email', this.form.email);
-        formData.append('password', this.form.password);
-        formData.append('fullname', this.form.fullname);
-        formData.append('service_id', this.form.service_id);
-        formData.append('experience', this.form.experience);  // Keep experience as string
-        formData.append('address', this.form.address);
-        formData.append('pincode', this.form.pincode);
-        formData.append('document', this.form.documents);
+        // Create a new FormData object
+        const formData = new FormData();
 
-        // Send POST request to Flask backend
+        // Append all the form fields to the FormData object
+        formData.append("email", this.form.email);
+        formData.append("password", this.form.password);
+        formData.append("fullname", this.form.fullname);
+        formData.append("service_id", this.form.service_id);
+        formData.append("experience", this.form.experience);
+        formData.append("address", this.form.address);
+        formData.append("pincode", this.form.pincode);
+
+        // Append the document (file) to the FormData object
+        if (this.form.documents) {
+          formData.append("documents", this.form.documents);
+        } else {
+          this.messages.push({
+            category: "danger",
+            text: "Please attach the required document.",
+          });
+          return; // Exit early if document is not provided
+        }
+
+        // Send POST request with FormData
         instance
-          .post('professional_register', formData)
+          .post("professional_register", formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",  // Indicate that we are sending form data
+            },
+          })
           .then((response) => {
             this.messages.push({
-              category: 'success',
+              category: "success",
               text: response.data.message,
             });
           })
           .catch((error) => {
             this.messages.push({
-              category: 'danger',
+              category: "danger",
               text: error.response.data.error,
             });
           });
       } else {
         this.messages.push({
-          category: 'danger',
-          text: 'Please fill in all required fields.',
+          category: "danger",
+          text: "Please fill in all required fields.",
         });
       }
     },
     closeMessage(index) {
-      // Remove the message at the specified index
       this.messages.splice(index, 1);
-    },
-    handleFileUpload(event) {
-      // Handle file upload
-      this.form.documents = event.target.files[0];
     },
   },
 };

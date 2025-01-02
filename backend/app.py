@@ -115,13 +115,28 @@ def delete_professional(id):
 
 @app.route('/api/get_service_requests', methods=['GET'])
 def get_service_requests():
-    service_requests = ServiceRequest.query.join(Service, ServiceRequest.service_id == Service.service_id).join(Professional, ServiceRequest.professional_id == Professional.professional_id).all()
-    return jsonify([{
-        'id': request.request_id,
-        'serviceName': request.service_name,
-        'professional': request.professional.full_name if request.professional else 'N/A',
-        'status': request.service_status
-    } for request in service_requests])
+    try:
+        # Query all service requests and join with the related service and professional data
+        service_requests = db.session.query(ServiceRequest, Service, Professional).\
+            join(Service, ServiceRequest.service_id == Service.service_id).\
+            outerjoin(Professional, ServiceRequest.professional_id == Professional.professional_id).\
+            all()
+        
+        # Prepare a list of service requests with the necessary details
+        service_requests_data = []
+        for request, service, professional in service_requests:
+            service_requests_data.append({
+                'id': request.request_id,
+                'serviceName': service.service_name,
+                'professional': professional.full_name if professional else None,
+                'status': request.service_status,
+            })
+        
+        return jsonify(service_requests_data), 200
+    except Exception as e:
+        print(f"Error fetching service requests: {e}")
+        return jsonify({"error": "Error fetching service requests"}), 500
+
 
 @app.route('/api/get_service_basedon_id/<int:id>', methods=['GET', 'PUT'])
 def get_service(id):
@@ -196,46 +211,90 @@ def update_service(service_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/api/admin_search", methods=["GET"])
 def admin_search():
     search_by = request.args.get("by")
     search_text = request.args.get("text")
-    page = request.args.get("page", 1, type=int)  # Default to the first page
-    per_page = request.args.get("per_page", 10, type=int)  # Number of results per page
     results = []
     total_results = 0
+
+    print(f"Searching by {search_by} for {search_text}")
 
     if search_by == "services":
         query = Service.query.filter(Service.service_name.ilike(f"%{search_text}%"))
         total_results = query.count()
-        results = query.paginate(page=page, per_page=per_page, error_out=False).items
+        results = query.all()  # Get all results without pagination
+        # Serialize only relevant fields for services
+        serialized_results = [
+            {
+                "service_id": result.service_id,
+                "service_name": result.service_name,
+                "base_price": result.base_price,
+                "status": result.description
+            }
+            for result in results
+        ]
+
     elif search_by == "service_requests":
-        query = ServiceRequest.query.filter(ServiceRequest.service_status.ilike(f"%{search_text}%"))
+        # Explicitly join ServiceRequest with Service and Professional tables
+        query = db.session.query(ServiceRequest, Service, Professional).join(
+            Service, ServiceRequest.service_id == Service.service_id) \
+            .join(Professional, ServiceRequest.professional_id == Professional.professional_id) \
+            .filter(ServiceRequest.service_status.ilike(f"%{search_text}%"))
+        
         total_results = query.count()
-        results = query.paginate(page=page, per_page=per_page, error_out=False).items
+        results = query.all()  # Get all results without pagination
+        
+        # Serialize only relevant fields for service requests
+        serialized_results = [
+            {
+                "service_id": result.Service.service_id ,
+                "service_name": result.Service.service_name,
+                "assigned_professional": result.Professional.full_name ,
+                "requested_date": result.ServiceRequest.date_of_request,
+                "status": result.ServiceRequest.service_status
+            }
+            for result in results
+        ]
+        
+        
+
     elif search_by == "customers":
         query = Customer.query.filter(Customer.full_name.ilike(f"%{search_text}%"))
         total_results = query.count()
-        results = query.paginate(page=page, per_page=per_page, error_out=False).items
+        results = query.all()  # Get all results without pagination
+        # Serialize only relevant fields for customers
+        serialized_results = [
+            {
+                "customer_name": result.full_name,
+                "address": result.address,
+                "pincode": result.pincode
+            }
+            for result in results
+        ]
+
     elif search_by == "professionals":
-        query = Professional.query.filter(Professional.full_name.ilike(f"%{search_text}%"))
+        # Explicitly join Professional with Service table
+        query = db.session.query(Professional, Service).join(
+            Service, Professional.service_id == Service.service_id) \
+            .filter(Professional.full_name.ilike(f"%{search_text}%"))
+        
         total_results = query.count()
-        results = query.paginate(page=page, per_page=per_page, error_out=False).items
-
-    # Serialize the results properly, ensuring `id`, `service_id`, and other attributes are included
-    serialized_results = [
-        {key: getattr(result, key) for key in result.__table__.columns.keys()} for result in results
-    ]
-
-    # Add `service_id` to results if applicable
-    for result in serialized_results:
-        if hasattr(result, "service_id"):
-            result["service_id"] = getattr(result, "service_id")
+        results = query.all()  # Get all results without pagination
+        # Serialize only relevant fields for professionals
+        serialized_results = [
+            {
+                "professional_name": result.Professional.full_name,
+                "experience": result.Professional.experience,
+                "service_provided": result.Service.service_name,  # Accessing service_name from the joined Service table
+                
+            }
+            for result in results
+        ]
 
     return jsonify({
         "results": serialized_results,
-        "page": page,
-        "per_page": per_page,
         "total": total_results
     }), 200
 
@@ -258,14 +317,31 @@ def get_ratings_summary():
 
 @app.route('/api/service-summary', methods=['GET'])
 def get_service_requests_summary():
-    service_requests_summary = db.session.query(
-        ServiceRequest.service_status,
-        db.func.count(ServiceRequest.service_status).label('count')
-    ).group_by(ServiceRequest.service_status).all()
+    # Query to fetch all service requests
+    service_requests = ServiceRequest.query.all()
 
-    service_data = {status: count for status, count in service_requests_summary}
+    # Create a dictionary to hold counts for all 4 statuses
+    service_data = {
+        'Requested': 0,
+        'Assigned': 0,
+        'Completed': 0,
+        'Rejected': 0
+    }
 
+    # Iterate over each service request and increment the count based on its status
+    for service_request in service_requests:
+        if service_request.service_status == 'requested':
+            service_data['Requested'] += 1
+        elif service_request.service_status == 'assigned':
+            service_data['Assigned'] += 1
+        elif service_request.service_status == 'completed':
+            service_data['Completed'] += 1
+        elif service_request.service_status == 'rejected':
+            service_data['Rejected'] += 1
+    print(service_data)
+    # Return the data as a JSON response
     return jsonify(service_data)
+
 
 
 @app.route('/api/login', methods=['POST'])
@@ -855,8 +931,10 @@ def register_professional():
     address = data.get('address')
     pincode = data.get('pincode')
 
+    print(f"Registering professional with email: {email} and password: {password}")
+
     # Handling the document file
-    document = request.files.get('document')
+    document = request.files.get('documents')
     document_data = document.read() if document else None
 
     # Creating a new professional record
