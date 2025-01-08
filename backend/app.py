@@ -270,6 +270,7 @@ def admin_search():
             }
             for result in results
         ]
+        
 
     elif search_by == "service_requests":
         # Explicitly join ServiceRequest with Service and Professional tables

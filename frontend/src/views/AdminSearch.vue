@@ -62,11 +62,24 @@
         <table class="table table-striped table-hover shadow rounded">
           <thead style="background-color: #d9eaf7; color: #084298;">
             <tr>
+              <th v-if="searchBy === 'services'">Service ID</th>
+              <th v-if="searchBy === 'services'">Service Name</th>
+              <th v-if="searchBy === 'services'">Service Description</th>
+              <th v-if="searchBy === 'services'">Service Price</th>
+              <th v-if="searchBy === 'service_requests'">Service ID</th>
+              <th v-if="searchBy === 'service_requests'">Service Name</th>
+              <th v-if="searchBy === 'service_requests'">Service Status</th>
+              <th v-if="searchBy === 'service_requests'">Assigned Professional</th>
+              <th v-if="searchBy === 'service_requests'">Requested Date</th>
+              <th v-if="searchBy === 'customers'">Customer Name</th>
+              <th v-if="searchBy === 'customers'">Address</th>
+              <th v-if="searchBy === 'customers'">Pincode</th>
               <th v-if="searchBy === 'professionals'">Professional Name</th>
               <th v-if="searchBy === 'professionals'">Experience</th>
               <th v-if="searchBy === 'professionals'">Service Provided</th>
               <th v-if="searchBy === 'professionals'">Blocked Status</th>
               <th v-if="searchBy === 'professionals'">Action</th>
+
             </tr>
           </thead>
           <tbody>
@@ -75,6 +88,18 @@
               :key="index"
               style="background-color: #f9f9f9; color: #333;"
             >
+              <td v-if="searchBy === 'services'">{{ result.service_id }}</td>
+              <td v-if="searchBy === 'services'">{{ result.service_name }}</td>
+              <td v-if="searchBy === 'services'">{{ result.status }}</td>
+              <td v-if="searchBy === 'services'">{{ result.base_price }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.service_id }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.service_name }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.status }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.assigned_professional }}</td>
+              <td v-if="searchBy === 'service_requests'">{{ result.requested_date }}</td>
+              <td v-if="searchBy === 'customers'">{{ result.customer_name }}</td>
+              <td v-if="searchBy === 'customers'">{{ result.address }}</td>
+              <td v-if="searchBy === 'customers'">{{ result.pincode }}</td>
               <td v-if="searchBy === 'professionals'">{{ result.professional_name }}</td>
               <td v-if="searchBy === 'professionals'">{{ result.experience }}</td>
               <td v-if="searchBy === 'professionals'">{{ result.service_provided }}</td>
@@ -143,7 +168,7 @@ export default {
           },
         });
         this.searchResults = response.data.results;
-
+        console.log("Search Results:", this.searchResults);
         // Fetch blocked status for professionals
         if (this.searchBy === "professionals" && this.searchResults.length) {
           await this.fetchBlockedStatus();
